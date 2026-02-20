@@ -24,7 +24,8 @@ echo
 echo
 
 
-OS=$(cat /etc/os-release | grep PRETTY_NAME | sed 's/"//g' | cut -f2 -d= | cut -f1 -d " ") # Don't change this unless you know what you're doing
+. /etc/os-release
+OS=$(echo "$ID" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')  # e.g. debian -> Debian
 if [ "$OS" == "Ubuntu" ] || [ "$OS" == "Raspbian" ] || [ "$OS" == "Debian" ];
 then
   :

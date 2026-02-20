@@ -7,9 +7,11 @@ Yellow='\033[0;33m'     # Yellow
 Green='\033[0;32m'      # Green
 
 ### Variables
-OS=$(cat /etc/os-release | grep PRETTY_NAME | sed 's/"//g' | cut -f2 -d= | cut -f1 -d " ") # Don't change this unless you know what you're doing
-OS_Version_Major=$(cat /etc/os-release | grep PRETTY_NAME | sed 's/"//g' | cut -f2 -d= | cut -f2 -d " " | cut -f1 -d ".")
-OS_Version_Minor=$(cat /etc/os-release | grep PRETTY_NAME | sed 's/"//g' | cut -f2 -d= | cut -f2 -d " " | cut -f2 -d ".")
+# Source /etc/os-release to use the standardized ID field (more reliable than parsing PRETTY_NAME)
+. /etc/os-release
+OS=$(echo "$ID" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')  # e.g. debian -> Debian
+OS_Version_Major=$(echo "${VERSION_ID:-0}" | cut -d. -f1)
+OS_Version_Minor=$(echo "${VERSION_ID:-0}" | cut -d. -f2)
 if [ "$OS" == "Ubuntu" ] || [ "$OS" == "Raspbian" ] || [ "$OS" == "Debian" ];
 then
   :
