@@ -6,8 +6,7 @@ Administer OpenVPN Server with a web interface (Users Management, Logs, Visualiz
 
 ## Prerequisite
 
-  * Raspbian or Ubuntu 20 with Bash access or remote SSH
-  * Ubuntu 21.x.x is not supprted yet
+  * Raspbian, Ubuntu 20+, or Debian 11/12 with Bash access or remote SSH
 
 ## Installation
 
@@ -28,8 +27,9 @@ Administer OpenVPN Server with a web interface (Users Management, Logs, Visualiz
 
 ## Tests
 
-* Rasbian: Only tested on Raspberry Pi 3 with Raspbian Buster (No GUI).
+* Raspbian: Only tested on Raspberry Pi 3 with Raspbian Buster (No GUI).
 * Ubuntu 20.04 LTS: Tested successfully
+* Debian 11 (Bullseye) / 12 (Bookworm): Supported
 
 ## Usage
 
