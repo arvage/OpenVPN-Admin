@@ -125,6 +125,20 @@
         echo json_encode($list);
       }
     }
+
+    // Select dashboard stats
+    else if($_GET['select'] == "stats"){
+      $total    = $bdd->query('SELECT COUNT(*) FROM user')->fetchColumn();
+      $online   = $bdd->query('SELECT COUNT(*) FROM user WHERE user_online = 1')->fetchColumn();
+      $disabled = $bdd->query('SELECT COUNT(*) FROM user WHERE user_enable = 0')->fetchColumn();
+      $logs     = $bdd->query('SELECT COUNT(*) FROM log')->fetchColumn();
+      echo json_encode([
+        'total_users'  => (int)$total,
+        'online_now'   => (int)$online,
+        'disabled'     => (int)$disabled,
+        'log_entries'  => (int)$logs
+      ]);
+    }
   }
 
   // ---------------- ADD USER ----------------

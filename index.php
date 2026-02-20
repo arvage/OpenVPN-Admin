@@ -201,22 +201,37 @@
     // --------------- GRIDS ---------------
     else{
   ?>
-      <nav class="navbar navbar-default">
-        <div class="row col-md-12">
-          <div class="col-md-6">
-            <p class="navbar-text signed">Signed in as <?php echo $_SESSION['admin_id']; ?>
-            </div>
-            <div class="col-md-6">
-              <a class="navbar-text navbar-right" href="index.php?logout" title="Logout"><button class="btn btn-danger">Logout <span class="glyphicon glyphicon-off" aria-hidden="true"></span></button></a>
-              <a class="navbar-text navbar-right" href="index.php" title="Configuration"><button class="btn btn-default">Configurations</button></a>
-              <a class="navbar-text navbar-right" href="index.php?admin_configuration_get" title="Get Config File"><button class="btn btn-default">Get Config File</button></a>
-            </p>
+    <div class="admin-wrapper">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <span class="glyphicon glyphicon-lock"></span> OpenVPN Admin
+        </div>
+        <ul class="sidebar-nav" id="admin-sidebar-nav">
+          <li class="active"><a href="#menu0" data-toggle="tab"><span class="glyphicon glyphicon-user"></span> OpenVPN Users</a></li>
+          <li><a href="#menu1" data-toggle="tab"><span class="glyphicon glyphicon-book"></span> OpenVPN Logs</a></li>
+          <li><a href="#menu2" data-toggle="tab"><span class="glyphicon glyphicon-king"></span> Web Admins</a></li>
+          <li><a href="#menu3" data-toggle="tab"><span class="glyphicon glyphicon-edit"></span> Configs</a></li>
+          <li><a href="#menu4" data-toggle="tab"><span class="glyphicon glyphicon-file"></span> File Name</a></li>
+        </ul>
+        <div class="sidebar-footer">
+          Signed in as <strong><?php echo htmlspecialchars($_SESSION['admin_id']); ?></strong>
+        </div>
+      </aside>
+      <div class="main-content">
+        <div class="topbar">
+          <span class="topbar-title">Dashboard</span>
+          <div>
+            <a href="index.php?admin_configuration_get"><button class="btn btn-sm btn-default">Get Config File</button></a>
+            <a href="index.php"><button class="btn btn-sm btn-default">Configurations</button></a>
+            <a href="index.php?logout"><button class="btn btn-sm btn-danger">Logout <span class="glyphicon glyphicon-off"></span></button></a>
           </div>
         </div>
-      </nav>
-
   <?php
       require(dirname(__FILE__) . '/include/html/grids.php');
+  ?>
+      </div>
+    </div>
+  <?php
     }
   ?>  
      <div id="message-stage">

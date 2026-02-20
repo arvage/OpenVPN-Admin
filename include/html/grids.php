@@ -27,13 +27,27 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
    return $history;
 }
 ?>
-<ul class="nav nav-tabs">
-   <li class="active"><a data-toggle="tab" href="#menu0"><span class="glyphicon glyphicon-user" aria-hidden="true"></span> OpenVPN Users</a></li>
-   <li><a data-toggle="tab" href="#menu1"><span class="glyphicon glyphicon-book" aria-hidden="true"></span> OpenVPN logs</a></li>
-   <li><a data-toggle="tab" href="#menu2"><span class="glyphicon glyphicon-king" aria-hidden="true"></span> Web Admins</a></li>
-   <li><a data-toggle="tab" href="#menu3"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Configs</a></li>
-    <li><a data-toggle="tab" href="#menu4"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span> File name</a></li>
-</ul>
+
+<!-- Stats Panel (Option B) -->
+<div class="stats-row" id="stats-row">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-total-users">-</div>
+    <div class="stat-label">Total Users</div>
+  </div>
+  <div class="stat-card stat-online">
+    <div class="stat-value" id="stat-online-now">-</div>
+    <div class="stat-label">Online Now</div>
+  </div>
+  <div class="stat-card stat-disabled">
+    <div class="stat-value" id="stat-disabled">-</div>
+    <div class="stat-label">Disabled</div>
+  </div>
+  <div class="stat-card stat-logs">
+    <div class="stat-value" id="stat-log-entries">-</div>
+    <div class="stat-label">Log Entries</div>
+  </div>
+</div>
+
 <div class="tab-content">
 
    <div id="menu0" class="tab-pane fade in active">
@@ -74,9 +88,7 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
    <div id="menu1" class="tab-pane fade">
       <!-- Logs grid -->
       <div class="block-grid row" id="log-grid">
-         <h4>
-            OpenVPN logs
-         </h4>
+         <h4>OpenVPN Logs</h4>
          <table id="table-logs" class="table" data-filter-control="true"></table>
       </div>
    </div>
@@ -125,33 +137,27 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
          </ul>
          <div class="tab-content">
             <div id="menu-1-0" class="tab-pane fade in active">
-
                <textarea class="form-control" data-config-file="<?= $cfg_file='client-conf/gnu-linux/client.conf' ?>" name="" id="" cols="30" rows="20"><?= file_get_contents($cfg_file) ?></textarea>
                <?= getHistory($cfg_file, @++$accId) ?>
-
             </div>
             <div id="menu-1-1" class="tab-pane fade">
-
                <textarea class="form-control" data-config-file="<?= $cfg_file='client-conf/windows/client.ovpn' ?>" name="" id="" cols="30" rows="20"><?= file_get_contents($cfg_file) ?></textarea>
                <?= getHistory($cfg_file, ++$accId) ?>
-
             </div>
             <div id="menu-1-2" class="tab-pane fade">
-
                <textarea class="form-control" data-config-file="<?= $cfg_file='client-conf/osx-viscosity/client.conf' ?>" name="" id="" cols="30" rows="20"><?= file_get_contents($cfg_file) ?></textarea>
                <?= getHistory($cfg_file, ++$accId) ?>
-
             </div>
          </div>
-
       </div>
    </div>
+
    <div id="menu4" class="tab-pane fade">
-      <!-- configs -->
+      <!-- filename -->
       <div class="block-grid row" id="config-cards">
          <ul class="nav nav-tabs nav-tabs-justified">
-                 <li><a data-toggle="tab" href="#menu-1-0"><span class="glyphicon glyphicon-heart" aria-hidden="true"></span> Ovpn Filename (without .ovpn extension)</a></li>
-                 <li id="save-config-btn" class="pull-right hidden"><a class="progress-bar-striped" href="javascript:;"><span class="glyphicon glyphicon-save" aria-hidden="true"></span></a></li>
+            <li><a data-toggle="tab" href="#menu-1-0"><span class="glyphicon glyphicon-heart" aria-hidden="true"></span> Ovpn Filename (without .ovpn extension)</a></li>
+            <li id="save-config-btn" class="pull-right hidden"><a class="progress-bar-striped" href="javascript:;"><span class="glyphicon glyphicon-save" aria-hidden="true"></span></a></li>
          </ul>
          <div class="tab-content">
             <div id="menu-1-0" class="tab-pane fade in active">
@@ -161,7 +167,48 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
          </div>
       </div>
    </div>
-   
+
+</div>
+
+<!-- Delete Confirm Modal (Option E) -->
+<div id="modal-confirm-delete" class="modal fade" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Confirm Delete</h4>
+      </div>
+      <div class="modal-body">
+        <p>Delete <strong id="modal-confirm-delete-name"></strong>? This cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="modal-confirm-delete-ok">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal (Option E) -->
+<div id="modal-reset-pass" class="modal fade" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Reset Password</h4>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="modal-reset-pass-input">New Password</label>
+          <input type="password" id="modal-reset-pass-input" class="form-control" autofocus />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" id="modal-reset-pass-save">Reset</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="vendor/jquery/dist/jquery.min.js"></script>
@@ -179,18 +226,22 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
 
 <script>
 $(document).ready(function(){
-   /*
-   https://stackoverflow.com/a/19015027/3214501
-   -> keep the currently active tab beyond page reloading
-   */
-   $('.nav.nav-tabs a').click(function(e) {
-     e.preventDefault();
-     $(this).tab('show');
-   });
-   $("ul.nav-tabs > li > a").on("shown.bs.tab", function(e) {
-     var id = $(e.target).attr("href").substr(1);
-     window.location.hash = id;
-   });
-   $('.nav.nav-tabs a[href="' + window.location.hash + '"]').tab('show');
+  // Update sidebar active state and URL hash when a tab is shown
+  $('#admin-sidebar-nav a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+    $('#admin-sidebar-nav li').removeClass('active');
+    $(this).parent().addClass('active');
+    window.location.hash = $(this).attr('href').substr(1);
+  });
+
+  // Restore active tab from URL hash on page load
+  var hash = window.location.hash;
+  if (hash) {
+    var $link = $('#admin-sidebar-nav a[href="' + hash + '"]');
+    if ($link.length) {
+      $('#admin-sidebar-nav li').removeClass('active');
+      $link.parent().addClass('active');
+      $link.tab('show');
+    }
+  }
 });
 </script>

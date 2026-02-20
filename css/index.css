@@ -68,3 +68,224 @@ https://bootsnipp.com/snippets/jvP6z
    background-color: #5cb85c; /* green */
    color: white;
 }
+
+/* ============ OPTION A: DARK SIDEBAR THEME ============ */
+
+.admin-wrapper {
+  display: flex;
+  margin: -10px -15px 0;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 230px;
+  min-width: 230px;
+  background: #1a1a2e;
+  color: #cdd6f4;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.4);
+  z-index: 100;
+}
+
+.sidebar-header {
+  padding: 18px 20px;
+  background: #12122a;
+  font-size: 1.05em;
+  font-weight: bold;
+  color: #89b4fa;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.sidebar-header .glyphicon {
+  margin-right: 8px;
+}
+
+.sidebar-nav {
+  list-style: none;
+  padding: 10px 0;
+  margin: 0;
+  flex: 1;
+}
+
+.sidebar-nav > li > a {
+  display: block;
+  padding: 12px 20px;
+  color: #a6adc8;
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, color 0.15s;
+  font-size: 0.95em;
+}
+
+.sidebar-nav > li > a .glyphicon {
+  margin-right: 8px;
+  width: 16px;
+  text-align: center;
+}
+
+.sidebar-nav > li > a:hover {
+  background: rgba(137,180,250,0.08);
+  color: #cdd6f4;
+  text-decoration: none;
+}
+
+.sidebar-nav > li.active > a {
+  background: rgba(137,180,250,0.15);
+  border-left-color: #89b4fa;
+  color: #89b4fa;
+}
+
+.sidebar-footer {
+  padding: 14px 20px;
+  background: #12122a;
+  font-size: 0.85em;
+  color: #6c7086;
+  border-top: 1px solid #2a2a4a;
+}
+
+.topbar {
+  background: #181825;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #313244;
+}
+
+.topbar-title {
+  color: #cdd6f4;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.topbar .btn {
+  margin-left: 6px;
+  font-size: 0.85em;
+}
+
+.main-content {
+  flex: 1;
+  background: #f0f0f5;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.main-content > .tab-content {
+  flex: 1;
+  padding: 20px;
+}
+
+.main-content .tab-pane {
+  background: #fff;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* ============ OPTION B: STATS PANEL ============ */
+
+.stats-row {
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #f8f8fc;
+  border-bottom: 1px solid #e0e0ea;
+}
+
+.stat-card {
+  flex: 1;
+  background: #fff;
+  border-radius: 6px;
+  padding: 14px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  text-align: center;
+  min-width: 0;
+}
+
+.stat-card .stat-value {
+  font-size: 2em;
+  font-weight: bold;
+  line-height: 1.1;
+  color: #333;
+}
+
+.stat-card .stat-label {
+  font-size: 0.78em;
+  color: #888;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-card.stat-online .stat-value  { color: #27ae60; }
+.stat-card.stat-disabled .stat-value { color: #e74c3c; }
+.stat-card.stat-logs .stat-value    { color: #2980b9; }
+
+/* ============ OPTION E: USERS TABLE UX ============ */
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  margin: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #ccc;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+
+.toggle-slider:before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: #5cb85c;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(18px);
+}
+
+/* Expired user row */
+tr.user-expired td {
+  background-color: rgba(220, 53, 69, 0.08) !important;
+  color: #a00;
+}
+
+tr.user-expired td:first-child {
+  border-left: 3px solid #dc3545;
+}
+
+/* Password cell */
+.pass-mask {
+  letter-spacing: 2px;
+  color: #888;
+  font-size: 1.1em;
+  margin-right: 6px;
+}
