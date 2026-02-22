@@ -45,6 +45,11 @@ $(function () {
       '<button class="btn btn-xs btn-warning reset-pass-btn" data-user-id="' + row.user_id + '">Reset</button>';
   }
 
+  function adminPassFormatter(value, row) {
+    return '<span class="pass-mask">\u2022\u2022\u2022\u2022\u2022\u2022</span>' +
+      '<button class="btn btn-xs btn-warning reset-pass-btn" data-admin-id="' + row.admin_id + '">Reset</button>';
+  }
+
   function LEDIndicatorFormatter(value, row, index) {
     return '<div class="' + (parseInt(value) === 1 ? 'mini-led-green' : 'mini-led-red') + '"></div>';
   }
@@ -205,6 +210,23 @@ $(function () {
     });
   }
 
+  function genericSetAdminField(field, new_value, pk) {
+    $.ajax({
+      url: gridsUrl,
+      data: {
+        set_admin: true,
+        name: field,
+        value: new_value,
+        pk: pk
+      },
+      method: 'POST',
+      success: function() {
+        refreshTable($adminTable);
+      },
+      error: onAjaxError
+    });
+  }
+
   var adminEditable = {
     url: gridsUrl,
     params: function (params) {
@@ -247,15 +269,26 @@ $(function () {
 
   $(document).on('click', '.reset-pass-btn', function() {
     var userId = $(this).data('user-id');
-    $resetPassModal.data('user-id', userId).modal('show');
+    var adminId = $(this).data('admin-id');
+    if (userId) {
+      $resetPassModal.data('reset-type', 'user').data('reset-id', userId);
+    } else if (adminId) {
+      $resetPassModal.data('reset-type', 'admin').data('reset-id', adminId);
+    }
+    $resetPassModal.modal('show');
     $('#modal-reset-pass-input').val('');
   });
 
   $('#modal-reset-pass-save').on('click', function() {
-    var userId = $resetPassModal.data('user-id');
+    var type = $resetPassModal.data('reset-type');
+    var id = $resetPassModal.data('reset-id');
     var newPass = $('#modal-reset-pass-input').val();
     if (newPass) {
-      genericSetField('user_pass', newPass, userId);
+      if (type === 'admin') {
+        genericSetAdminField('admin_pass', newPass, id);
+      } else {
+        genericSetField('user_pass', newPass, id);
+      }
     }
     $resetPassModal.modal('hide');
   });
@@ -271,6 +304,12 @@ $(function () {
   }
 
   loadStats();
+
+  // Auto-refresh stats and user table every 5 seconds
+  setInterval(function() {
+    loadStats();
+    refreshTable($userTable);
+  }, 5000);
 
   // -------------------- USERS --------------------
 
@@ -339,7 +378,19 @@ $(function () {
     idField: 'admin_id',
     columns: [
       { title: "ID", field: "admin_id", editable: adminEditable },
-      { title: "Pass", field: "admin_pass", editable: adminEditable },
+      { title: "Pass", field: "admin_pass", formatter: adminPassFormatter },
+      { title: "Mail", field: "admin_mail", editable: adminEditable },
+      { title: "Phone", field: "admin_phone", editable: adminEditable },
+      {
+        title: "Enabled",
+        field: "admin_enable",
+        formatter: toggleFormatter,
+        events: {
+          'change input': function (e, value, row) {
+            genericSetAdminField('admin_enable', e.target.checked ? '1' : '0', row.admin_id);
+          }
+        }
+      },
       {
         title: 'Delete',
         field: "admin_del",
@@ -372,14 +423,11 @@ $(function () {
       return params;
     },
     columns: [
-      { title: "Log ID", field: "log_id", align: "center" },
-      { title: "User ID", field: "user_id", filterControl: 'select', align: "center" },
-      { title: "Client IP", field: "log_trusted_ip", filterControl: 'select', align: "center" },
-      { title: "Local IP", field: "log_remote_ip", filterControl: 'select', align: "center" },
-      { title: "Start Time", field: "log_start_time", align: "center" },
-      { title: "End Time", field: "log_end_time", align: "center" },
-      { title: "Received", field: "log_received", align: "center", cellStyle: bytesStyle },
-      { title: "Sent", field: "log_send", align: "center", cellStyle: bytesStyle }
+      { title: "User ID", field: "user_id", align: "center" },
+      { title: "Sessions", field: "sessions", align: "center" },
+      { title: "Total Received", field: "total_received", align: "center", cellStyle: bytesStyle },
+      { title: "Total Sent", field: "total_sent", align: "center", cellStyle: bytesStyle },
+      { title: "Last Connected", field: "last_connected", align: "center" }
     ]
   });
 

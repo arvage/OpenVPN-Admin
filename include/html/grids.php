@@ -50,7 +50,7 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
 
 <div class="tab-content">
 
-   <div id="menu0" class="tab-pane fade in active">
+   <div id="menu0" class="tab-pane fade <?= $page=='users'?'in active':'' ?>">
       <!-- Users grid -->
       <div class="block-grid row" id="user-grid">
          <h4>
@@ -85,7 +85,7 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
       </div>
    </div>
 
-   <div id="menu1" class="tab-pane fade">
+   <div id="menu1" class="tab-pane fade <?= $page=='logs'?'in active':'' ?>">
       <!-- Logs grid -->
       <div class="block-grid row" id="log-grid">
          <h4>OpenVPN Logs</h4>
@@ -93,7 +93,7 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
       </div>
    </div>
 
-   <div id="menu2" class="tab-pane fade">
+   <div id="menu2" class="tab-pane fade <?= $page=='admins'?'in active':'' ?>">
       <!-- Admins grid -->
       <div class="block-grid row" id="admin-grid">
          <h4>
@@ -128,7 +128,7 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
       </div>
    </div>
 
-   <div id="menu3" class="tab-pane fade">
+   <div id="menu3" class="tab-pane fade <?= $page=='configs'?'in active':'' ?>">
       <!-- configs -->
       <div class="block-grid row" id="config-cards">
          <ul class="nav nav-tabs nav-tabs-justified">
@@ -152,7 +152,7 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
       </div>
    </div>
 
-   <div id="menu4" class="tab-pane fade">
+   <div id="menu4" class="tab-pane fade <?= $page=='filename'?'in active':'' ?>">
       <!-- filename -->
       <div class="block-grid row" id="config-cards">
          <ul class="nav nav-tabs nav-tabs-justified">
@@ -224,24 +224,3 @@ function getHistory($cfg_file, $accordion_id, $open_first_history_tab = false) {
 <script src="vendor/x-editable/dist/bootstrap3-editable/js/bootstrap-editable.js"></script>
 <script src="js/grids.js"></script>
 
-<script>
-$(document).ready(function(){
-  // Update sidebar active state and URL hash when a tab is shown
-  $('#admin-sidebar-nav a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
-    $('#admin-sidebar-nav li').removeClass('active');
-    $(this).parent().addClass('active');
-    window.location.hash = $(this).attr('href').substr(1);
-  });
-
-  // Restore active tab from URL hash on page load
-  var hash = window.location.hash;
-  if (hash) {
-    var $link = $('#admin-sidebar-nav a[href="' + hash + '"]');
-    if ($link.length) {
-      $('#admin-sidebar-nav li').removeClass('active');
-      $link.parent().addClass('active');
-      $link.tab('show');
-    }
-  }
-});
-</script>
