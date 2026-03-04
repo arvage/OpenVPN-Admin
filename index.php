@@ -118,7 +118,7 @@
 
     <link rel="icon" type="image/png" href="css/icon.png">
   </head>
-  <body class='container-fluid'>
+  <body class='container-fluid<?php if(!isset($_GET['installation']) && (!isset($_GET['admin']) || !isset($_SESSION['admin_id']))) echo ' unified-login-body'; ?>'>
   <?php
 
     // --------------- INSTALLATION ---------------
@@ -179,44 +179,57 @@
       exit(-1);
     }
 
-    // --------------- CONFIGURATION ---------------
-    if(!isset($_GET['admin'])) {
+    // --------------- UNIFIED LOGIN / CONFIG ---------------
+    if(!isset($_GET['admin']) || !isset($_SESSION['admin_id'])) {
       if(isset($error) && $error == true)
         printError('Login error');
 
-      require(dirname(__FILE__) . '/include/html/menu.php');
-      require(dirname(__FILE__) . '/include/html/form/configuration.php');
-    }
-
-
-    // --------------- LOGIN ---------------
-    else if(!isset($_SESSION['admin_id'])){
-      if(isset($error) && $error == true)
-        printError('Login error');
-
-      require(dirname(__FILE__) . '/include/html/menu.php');
-      require(dirname(__FILE__) . '/include/html/form/login.php');
+      require(dirname(__FILE__) . '/include/html/form/unified-login.php');
     }
 
     // --------------- GRIDS ---------------
     else{
+      $page = isset($_GET['page']) ? $_GET['page'] : 'users';
+      $page_titles = array(
+        'users' => 'OpenVPN Users',
+        'logs' => 'OpenVPN Logs',
+        'admins' => 'Web Admins',
+        'configs' => 'Configs',
+        'filename' => 'File Name',
+      );
+      $topbar_title = isset($page_titles[$page]) ? $page_titles[$page] : 'OpenVPN Users';
   ?>
-      <nav class="navbar navbar-default">
-        <div class="row col-md-12">
-          <div class="col-md-6">
-            <p class="navbar-text signed">Signed in as <?php echo $_SESSION['admin_id']; ?>
-            </div>
-            <div class="col-md-6">
-              <a class="navbar-text navbar-right" href="index.php?logout" title="Logout"><button class="btn btn-danger">Logout <span class="glyphicon glyphicon-off" aria-hidden="true"></span></button></a>
-              <a class="navbar-text navbar-right" href="index.php" title="Configuration"><button class="btn btn-default">Configurations</button></a>
-              <a class="navbar-text navbar-right" href="index.php?admin_configuration_get" title="Get Config File"><button class="btn btn-default">Get Config File</button></a>
-            </p>
+    <div class="admin-wrapper">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <a href="index.php?admin" style="color:inherit;text-decoration:none"><span class="glyphicon glyphicon-lock"></span> OpenVPN Admin</a>
+        </div>
+        <ul class="sidebar-nav" id="admin-sidebar-nav">
+          <li class="<?= $page=='users'?'active':'' ?>"><a href="index.php?admin&page=users"><span class="glyphicon glyphicon-user"></span> OpenVPN Users</a></li>
+          <li class="<?= $page=='logs'?'active':'' ?>"><a href="index.php?admin&page=logs"><span class="glyphicon glyphicon-book"></span> OpenVPN Logs</a></li>
+          <li class="<?= $page=='admins'?'active':'' ?>"><a href="index.php?admin&page=admins"><span class="glyphicon glyphicon-king"></span> Web Admins</a></li>
+          <li class="<?= $page=='configs'?'active':'' ?>"><a href="index.php?admin&page=configs"><span class="glyphicon glyphicon-edit"></span> Configs</a></li>
+          <li class="<?= $page=='filename'?'active':'' ?>"><a href="index.php?admin&page=filename"><span class="glyphicon glyphicon-file"></span> File Name</a></li>
+        </ul>
+        <div class="sidebar-footer">
+          Signed in as <strong><?php echo htmlspecialchars($_SESSION['admin_id']); ?></strong>
+        </div>
+      </aside>
+      <div class="main-content">
+        <div class="topbar">
+          <span class="topbar-title"><?= htmlspecialchars($topbar_title) ?></span>
+          <div>
+            <a href="index.php?admin_configuration_get"><button class="btn btn-sm btn-default">Get Config File</button></a>
+            <a href="index.php"><button class="btn btn-sm btn-default">Configurations</button></a>
+            <a href="index.php?logout"><button class="btn btn-sm btn-danger">Logout <span class="glyphicon glyphicon-off"></span></button></a>
           </div>
         </div>
-      </nav>
-
   <?php
       require(dirname(__FILE__) . '/include/html/grids.php');
+  ?>
+      </div>
+    </div>
+  <?php
     }
   ?>  
      <div id="message-stage">

@@ -74,5 +74,6 @@ a2dissite openvpn
 a2ensite 000-default
 systemctl restart apache2
 
-sed -i "/added by openvpn-admin/d" /etc/php/7.3/apache2/php.ini
+php_version=$(php -v | head -n1 | cut -f2 -d\  | cut -f1,2 -d.)
+sed -i "/added by openvpn-admin/d" /etc/php/$php_version/apache2/php.ini
 echo "The application has been completely removed!"

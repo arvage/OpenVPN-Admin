@@ -37,71 +37,58 @@
       }
     }
 
-    // Select the logs
+    // Select the logs (aggregated per user)
     else if($_GET['select'] == "log" && isset($_GET['offset'], $_GET['limit'])){
       $offset = intval($_GET['offset']);
       $limit = intval($_GET['limit']);
 
-      // Creation of the LIMIT for build different pages
       $page = "LIMIT $offset, $limit";
 
-      // ... filtering by the bootstrap table plugin
-      $filter = isset($_GET['filter']) ? json_decode($_GET['filter'],true) : []; // this is passed by the bootstrap table filter plugin (if a filter was chosen by the user): these are the concrete set filters with their value
-      $where = !empty($filter)?'WHERE TRUE':'';
-      $allowed_query_filters = ['user_id', 'log_trusted_ip','log_trusted_port','log_remote_ip','log_remote_port']; // these are valid filters that could be used (defined here for sql security reason)
-      $query_filters_existing = [];
-      foreach($filter as $unsanitized_filter_key => $unsanitized_filter_val) {
-         if(in_array($unsanitized_filter_key, $allowed_query_filters)) { // if this condition does not match: ignore it, because this parameter should not be passed
-            // if $unsanitized_filter_key is in array $allowed_query_filters its a valid key and can not be harmful, so it can be considered sanitized
-            $where .= " AND $unsanitized_filter_key = ?";
-            $query_filters_existing[] = $unsanitized_filter_key;
-         }
-      }
+      // Count total users with logs
+      $count_req = $bdd->query("SELECT COUNT(DISTINCT user_id) FROM log");
+      $nb = $count_req->fetchColumn();
 
-      // Select the logs
-      $req_string = "SELECT *, (SELECT COUNT(*) FROM log $where) AS nb FROM log $where ORDER BY log_id DESC $page";
+      // Aggregate logs per user: total received, total sent, session count, last connection
+      $req_string = "SELECT user_id,
+        COUNT(*) AS sessions,
+        SUM(log_received) AS total_received,
+        SUM(log_send) AS total_sent,
+        MAX(log_start_time) AS last_connected
+        FROM log GROUP BY user_id ORDER BY last_connected DESC $page";
       $req = $bdd->prepare($req_string);
-
-      // dynamically bind the params
-      foreach(array_merge($query_filters_existing,$query_filters_existing) as $i => $query_filter) // array_merge -> duplicated the array contents; this is needed because our where clause is bound two times (in subquery + the outer query)
-         $req->bindValue($i+1, $filter[$query_filter]);
-
       $req->execute();
 
       $list = array();
 
-      $data = $req->fetch();
+      while($data = $req->fetch()) {
+        $received = $data['total_received'];
+        $sent = $data['total_sent'];
 
-      if($data) {
-        $nb = $data['nb'];
+        if ($received > 1000000000) {
+          $received = round($received/1000000000, 1) . " GB";
+        } else if ($received > 1000000) {
+          $received = floor($received/1000000) . " MB";
+        } else {
+          $received = floor($received/1000) . " KB";
+        }
 
-        do {
-          // Better in Kb or Mb
-          $received = ($data['log_received'] > 1000000) ? floor($data['log_received']/1000000) . " MB" : floor($data['log_received']/1000) . " KB";
-          $sent = ($data['log_send'] > 1000000) ? floor($data['log_send']/1000000) . " MB" : floor($data['log_send']/1000) . " KB";
+        if ($sent > 1000000000) {
+          $sent = round($sent/1000000000, 1) . " GB";
+        } else if ($sent > 1000000) {
+          $sent = floor($sent/1000000) . " MB";
+        } else {
+          $sent = floor($sent/1000) . " KB";
+        }
 
-          // We add to the array the new line of logs
-          array_push($list, array(
-                                  "log_id" => $data['log_id'],
-                                  "user_id" => $data['user_id'],
-                                  "log_trusted_ip" => $data['log_trusted_ip'],
-                                  "log_trusted_port" => $data['log_trusted_port'],
-                                  "log_remote_ip" => $data['log_remote_ip'],
-                                  "log_remote_port" => $data['log_remote_port'],
-                                  "log_start_time" => $data['log_start_time'],
-                                  "log_end_time" => $data['log_end_time'],
-                                  "log_received" => $received,
-                                  "log_send" => $sent));
-
-        } while ($data = $req->fetch());
+        array_push($list, array(
+                                "user_id" => $data['user_id'],
+                                "sessions" => $data['sessions'],
+                                "total_received" => $received,
+                                "total_sent" => $sent,
+                                "last_connected" => $data['last_connected']));
       }
-      else {
-        $nb = 0;
-      }
 
-      // We finally print the result
       $result = array('total' => intval($nb), 'rows' => $list);
-
       echo json_encode($result);
     }
 
@@ -114,7 +101,10 @@
         do{
           $list[] = array(
                           "admin_id" => $data['admin_id'],
-                          "admin_pass" => $data['admin_pass']
+                          "admin_pass" => $data['admin_pass'],
+                          "admin_mail" => $data['admin_mail'],
+                          "admin_phone" => $data['admin_phone'],
+                          "admin_enable" => $data['admin_enable']
                           );
         } while($data = $req->fetch());
 
@@ -124,6 +114,20 @@
         $list = array();
         echo json_encode($list);
       }
+    }
+
+    // Select dashboard stats
+    else if($_GET['select'] == "stats"){
+      $total    = $bdd->query('SELECT COUNT(*) FROM user')->fetchColumn();
+      $online   = $bdd->query('SELECT COUNT(*) FROM user WHERE user_online = 1')->fetchColumn();
+      $disabled = $bdd->query('SELECT COUNT(*) FROM user WHERE user_enable = 0')->fetchColumn();
+      $logs     = $bdd->query('SELECT COUNT(*) FROM log')->fetchColumn();
+      echo json_encode([
+        'total_users'  => (int)$total,
+        'online_now'   => (int)$online,
+        'disabled'     => (int)$disabled,
+        'log_entries'  => (int)$logs
+      ]);
     }
   }
 
@@ -189,13 +193,28 @@
 
   // ---------------- ADD ADMIN ----------------
   else if(isset($_POST['add_admin'], $_POST['admin_id'], $_POST['admin_pass'])){
-    $req = $bdd->prepare('INSERT INTO admin(admin_id, admin_pass) VALUES (?, ?)');
-    $req->execute(array($_POST['admin_id'], hashPass($_POST['admin_pass'])));
+    $id = $_POST['admin_id'];
+    $pass = hashPass($_POST['admin_pass']);
+    $mail = "";
+    $phone = "";
+    $enable = 1;
+
+    $req = $bdd->prepare('INSERT INTO admin (admin_id, admin_pass, admin_mail, admin_phone, admin_enable) VALUES (?, ?, ?, ?, ?)');
+    $req->execute(array($id, $pass, $mail, $phone, $enable));
+
+    $res = array("admin_id" => $id,
+      "admin_pass" => $pass,
+      "admin_mail" => $mail,
+      "admin_phone" => $phone,
+      "admin_enable" => $enable
+    );
+
+    echo json_encode($res);
   }
 
   // ---------------- UPDATE ADMIN ----------------
   else if(isset($_POST['set_admin'])){
-    $valid = array("admin_id", "admin_pass");
+    $valid = array("admin_id", "admin_pass", "admin_mail", "admin_phone", "admin_enable");
 
     $field = $_POST['name'];
     $value = $_POST['value'];
