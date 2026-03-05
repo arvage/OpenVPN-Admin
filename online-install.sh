@@ -40,7 +40,7 @@ DEBIAN_FRONTEND=noninteractive sudo apt-get update && sudo apt-get upgrade -y -q
 DEBIAN_FRONTEND=noninteractive sudo apt-get install -y git mc
 cd ~
 echo -e "${Red}"
-git clone https://github.com/ringmor/OpenVPN-Admin openvpn-admin
+git clone https://github.com/arvage/OpenVPN-Admin openvpn-admin
 echo -e "${NC}"
 cd openvpn-admin
 chmod +x ./install.sh
