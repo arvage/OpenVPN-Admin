@@ -184,7 +184,7 @@
       if(isset($error) && $error == true)
         printError('Login error');
 
-      require(dirname(__FILE__) . '/include/html/form/unified-login.php');
+      require(dirname(__FILE__) . '/include/html/form/login.php');
     }
 
     // --------------- GRIDS ---------------
