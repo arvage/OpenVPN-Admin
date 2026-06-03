@@ -147,10 +147,8 @@ case $OS in
 		echo -e "${Red}Can't detect OS distribution! you need to install prerequisites manully${NC}"
     exit
 esac
-npm install -g bower
-
 # Ensure the prerequisites are installed
-for i in openvpn apache2 mysql php unzip git wget sed curl nodejs npm; do
+for i in openvpn apache2 mysql php unzip git wget sed curl; do
   which $i > /dev/null
   if [ "$?" -ne 0 ]; then
     echo -e "${Red}$i is missing. Please install $i manually.${NC}"
@@ -327,7 +325,7 @@ sed -i "s/PASS=''/PASS='$mysql_pass'/" "/etc/openvpn/scripts/config.sh"
 
 # Create the directory of the web application
 mkdir "$openvpn_admin"
-cp -r "$base_path/"{index.php,sql,bower.json,.bowerrc,js,include,css,installation/client-conf} "$openvpn_admin"
+cp -r "$base_path/"{index.php,sql,js,include,css,installation/client-conf} "$openvpn_admin"
 
 # New workspace
 cd "$openvpn_admin"
@@ -357,8 +355,6 @@ for directory in "./client-conf/gnu-linux/" "./client-conf/osx-viscosity/" "./cl
   cp "/etc/openvpn/"{ca.crt,ta.key} $directory
 done
 
-# Install third parties
-bower --allow-root install
 chown -R "$user:$group" "$openvpn_admin"
 
 echo -e "${Green}Setting Apache Configuration${NC}"

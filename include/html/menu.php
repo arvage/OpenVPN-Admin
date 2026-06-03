@@ -1,12 +1,17 @@
-<div class="col-md-6 col-md-offset-3">
-  <nav class="navbar navbar-default">
-
-    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-      <ul class="nav navbar-nav">
-        <li <?php if(!isset($_GET['admin'])) echo 'class="active"'; ?>><a href="index.php">Configurations</a></li>
-        <li <?php if(isset($_GET['admin'])) echo 'class="active"'; ?>><a href="index.php?admin">Administrator</a></li>
-      </ul>
-    </div>
-
-  </nav>
-</div>
+<nav class="navbar navbar-expand navbar-dark bg-dark mb-4 px-3">
+  <a class="navbar-brand" href="index.php">
+    <i class="bi bi-shield-lock me-2"></i>OpenVPN Admin
+  </a>
+  <ul class="navbar-nav">
+    <li class="nav-item">
+      <a class="nav-link<?php if(!isset($_GET['admin'])) echo ' active'; ?>" href="index.php">
+        <i class="bi bi-download me-1"></i>Get Config
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link<?php if(isset($_GET['admin'])) echo ' active'; ?>" href="index.php?admin">
+        <i class="bi bi-speedometer2 me-1"></i>Admin Panel
+      </a>
+    </li>
+  </ul>
+</nav>

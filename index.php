@@ -4,236 +4,293 @@
   require(dirname(__FILE__) . '/include/functions.php');
   require(dirname(__FILE__) . '/include/connect.php');
 
-  // first time install
-  if(($_SERVER[REQUEST_URI] != "/index.php?installation") && (isInstalled($bdd) == false)) {
-    header("Location: index.php?installation");
+  // First-time install redirect
+  if (($_SERVER['REQUEST_URI'] !== '/index.php?installation') && !isInstalled($bdd)) {
+    header('Location: index.php?installation');
     exit(-1);
   }
-  
-  // Disconnecting ?
-  if(isset($_GET['logout'])){
+
+  // Logout
+  if (isset($_GET['logout'])) {
     session_destroy();
-    header("Location: .");
+    header('Location: .');
     exit(-1);
   }
 
-  // Read ovpn file contents
-  $ovpn_filename= file_get_contents("./client-conf/windows/filename");
+  // Read ovpn filename
+  $ovpn_filename = trim(@file_get_contents('./client-conf/windows/filename') ?: 'client');
 
-  // Get the Windows instruction file 
-  if(isset($_POST['windows_instruction_get'])) {
-      $download_file_name1 = "Download and install the OpenVPN GUI (Windows).pdf";
-      $file_folder1  = "windows";
-      $file_full_path1  = './client-conf/' . $file_folder1 . '/' . $download_file_name1;
-      header("Content-type: application/pdf");
-      header("Content-disposition: attachment; filename=$download_file_name1");
-      header("Pragma: no-cache");
-      header("Expires: 0");
-      readfile($file_full_path1);
-      exit;
-     }
-
-  // Get the MAC instruction file 
-  if(isset($_POST['mac_instruction_get'])) {
-    
-      $download_file_name2 = "Download and install the OpenVPN GUI (MAC).pdf";
-      $file_folder2  = "osx-viscosity";
-      $file_full_path2  = './client-conf/' . $file_folder2 . '/' . $download_file_name2;
-      header("Content-type: application/pdf");
-      header("Content-disposition: attachment; filename=$download_file_name2");
-      header("Pragma: no-cache");
-      header("Expires: 0");
-      readfile($file_full_path2);
-      exit;
+  // Windows instruction download
+  if (isset($_POST['windows_instruction_get'])) {
+    $f = './client-conf/windows/Download and install the OpenVPN GUI (Windows).pdf';
+    if (file_exists($f)) {
+      header('Content-type: application/pdf');
+      header('Content-Disposition: attachment; filename="OpenVPN Windows Guide.pdf"');
+      readfile($f);
     }
-
-  // Get configuration file from admin page
-  if(isset($_GET['admin_configuration_get'])  && !empty($_SESSION['admin_id']) ) {
-    $file_name = "client.ovpn";
-    $file_folder  = "windows";
-    $file_full_path  = './client-conf/' . $file_folder . '/' . $file_name;
-    header("Content-type: application/ovpn");
-    header("Content-disposition: attachment; filename=$ovpn_filename.ovpn");
-    header("Pragma: no-cache");
-    header("Expires: 0");
-    readfile($file_full_path);
     exit;
   }
 
-  // Get the configuration files from configuration page
-  if(isset($_POST['configuration_get'], $_POST['configuration_username'], $_POST['configuration_pass']) && !empty($_POST['configuration_pass'])) {
+  // macOS instruction download
+  if (isset($_POST['mac_instruction_get'])) {
+    $f = './client-conf/osx-viscosity/Download and install the OpenVPN GUI (MAC).pdf';
+    if (file_exists($f)) {
+      header('Content-type: application/pdf');
+      header('Content-Disposition: attachment; filename="OpenVPN macOS Guide.pdf"');
+      readfile($f);
+    }
+    exit;
+  }
+
+  // Admin: download shared config
+  if (isset($_GET['admin_configuration_get']) && !empty($_SESSION['admin_id'])) {
+    $f = './client-conf/windows/client.ovpn';
+    header('Content-Type: application/octet-stream');
+    header("Content-Disposition: attachment; filename=\"$ovpn_filename.ovpn\"");
+    readfile($f);
+    exit;
+  }
+
+  // User: download config with credentials
+  if (isset($_POST['configuration_get'], $_POST['configuration_username'], $_POST['configuration_pass'])
+      && !empty($_POST['configuration_pass'])) {
     $req = $bdd->prepare('SELECT * FROM user WHERE user_id = ?');
-    $req->execute(array($_POST['configuration_username']));
+    $req->execute([$_POST['configuration_username']]);
     $data = $req->fetch();
 
-    // Error ?
-    if($data && passEqual($_POST['configuration_pass'], $data['user_pass'])) {
-      $file_name = "client.ovpn";
-      $file_folder  = "windows";
-      $file_full_path  = './client-conf/' . $file_folder . '/' . $file_name;
-      header("Content-type: application/ovpn");
-      header("Content-disposition: attachment; filename=$ovpn_filename.ovpn");
-      header("Pragma: no-cache");
-      header("Expires: 0");
-      readfile($file_full_path);
+    if ($data && passEqual($_POST['configuration_pass'], $data['user_pass'])) {
+      $f = './client-conf/windows/client.ovpn';
+      header('Content-Type: application/octet-stream');
+      header("Content-Disposition: attachment; filename=\"$ovpn_filename.ovpn\"");
+      readfile($f);
       exit;
-    }
-    else {
+    } else {
       $error = true;
     }
   }
 
-  // Admin login attempt ?
-  else if(isset($_POST['admin_login'], $_POST['admin_username'], $_POST['admin_pass']) && !empty($_POST['admin_pass'])){
-
+  // Admin login
+  else if (isset($_POST['admin_login'], $_POST['admin_username'], $_POST['admin_pass'])
+           && !empty($_POST['admin_pass'])) {
     $req = $bdd->prepare('SELECT * FROM admin WHERE admin_id = ?');
-    $req->execute(array($_POST['admin_username']));
+    $req->execute([$_POST['admin_username']]);
     $data = $req->fetch();
 
-    // Error ?
-    if($data && passEqual($_POST['admin_pass'], $data['admin_pass'])) {
+    if ($data && (!isset($data['admin_enable']) || $data['admin_enable']) && passEqual($_POST['admin_pass'], $data['admin_pass'])) {
       $_SESSION['admin_id'] = $data['admin_id'];
-      header("Location: index.php?admin");
+      header('Location: index.php?admin');
+      exit(-1);
+    } else {
+      $error = true;
+    }
+  }
+
+  $isAdmin = isset($_GET['admin']) && isset($_SESSION['admin_id']);
+  $isInstall = isset($_GET['installation']);
+  $adminRole = $isAdmin ? getCurrentAdminRole($bdd) : null;
+
+  $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
+  $valid_pages = ['dashboard', 'users', 'logs', 'admins', 'configs', 'filename', 'certificates', 'settings'];
+  if (!in_array($page, $valid_pages)) $page = 'dashboard';
+
+  $page_titles = [
+    'dashboard'    => 'Dashboard',
+    'users'        => 'OpenVPN Users',
+    'logs'         => 'Logs',
+    'admins'       => 'Web Admins',
+    'configs'      => 'Configs',
+    'filename'     => 'File Name',
+    'certificates' => 'Certificates',
+    'settings'     => 'Settings',
+  ];
+  $topbar_title = $page_titles[$page] ?? 'Dashboard';
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>OpenVPN Admin</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/bootstrap-table.min.css"/>
+  <link rel="stylesheet" href="css/index.css"/>
+  <link rel="icon" type="image/png" href="css/icon.png"/>
+</head>
+<body class="<?php
+  if ($isAdmin) echo 'admin-layout';
+  else if ($isInstall) echo 'install-layout bg-light';
+  else echo 'login-layout bg-light';
+?>">
+<?php
+
+  // ─── INSTALLATION ───
+  if ($isInstall) {
+    if (isInstalled($bdd)) {
+      printError('OpenVPN-admin is already installed. Redirecting…');
+      header('refresh:3;url=index.php?admin');
       exit(-1);
     }
-    else {
-      $error = true;
-    }
-  }
-?>
-
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-
-    <title>OpenVPN-Admin</title>
-
-    <link rel="stylesheet" href="vendor/bootstrap/dist/css/bootstrap.min.css" type="text/css" />
-    <link rel="stylesheet" href="vendor/x-editable/dist/bootstrap3-editable/css/bootstrap-editable.css" type="text/css" />
-    <link rel="stylesheet" href="vendor/bootstrap-table/dist/bootstrap-table.min.css" type="text/css" />
-    <link rel="stylesheet" href="vendor/bootstrap-datepicker/dist/css/bootstrap-datepicker3.css" type="text/css" />
-    <link rel="stylesheet" href="vendor/bootstrap-table/dist/extensions/filter-control/bootstrap-table-filter-control.css" type="text/css" />
-    <link rel="stylesheet" href="css/index.css" type="text/css" />
-
-    <link rel="icon" type="image/png" href="css/icon.png">
-  </head>
-  <body class='container-fluid<?php if(!isset($_GET['installation']) && (!isset($_GET['admin']) || !isset($_SESSION['admin_id']))) echo ' unified-login-body'; ?>'>
-  <?php
-
-    // --------------- INSTALLATION ---------------
-    if(isset($_GET['installation'])) {
-      if(isInstalled($bdd) == true) {
-        printError('OpenVPN-admin is already installed. Redirection.');
-        header( "refresh:3;url=index.php?admin" );
+    if (isset($_POST['admin_username'])) {
+      if ($_POST['admin_pass'] !== $_POST['repeat_admin_pass']) {
+        printError('Passwords do not match.');
+        header('refresh:3;url=index.php?installation');
         exit(-1);
       }
-
-      // If the user sent the installation form
-      if(isset($_POST['admin_username'])) {
-        $admin_username = $_POST['admin_username'];
-        $admin_pass = $_POST['admin_pass'];
-        $admin_repeat_pass = $_POST['repeat_admin_pass'];
-
-        if($admin_pass != $admin_repeat_pass) {
-          printError('The passwords do not correspond. Redirection.');
-          header( "refresh:3;url=index.php?installation" );
-          exit(-1);
+      $migrations = getMigrationSchemas();
+      foreach ($migrations as $mv) {
+        $sql_file = dirname(__FILE__) . "/sql/schema-$mv.sql";
+        if (!file_exists($sql_file)) continue;
+        try {
+          $bdd->exec(file_get_contents($sql_file));
+        } catch (PDOException $e) {
+          printError($e->getMessage()); exit(1);
         }
-
-        // Create the initial tables
-        $migrations = getMigrationSchemas();
-        foreach ($migrations as $migration_value) {
-          $sql_file = dirname(__FILE__) . "/sql/schema-$migration_value.sql";
-          try {
-            $sql = file_get_contents($sql_file);
-            $bdd->exec($sql);
-          }
-          catch (PDOException $e) {
-            printError($e->getMessage());
-            exit(1);
-          }
-
-          unlink($sql_file);
-
-          // Update schema to the new value
-          updateSchema($bdd, $migration_value);
-        }
-
-        // Generate the hash
-        $hash_pass = hashPass($admin_pass);
-
-        // Insert the new admin
-        $req = $bdd->prepare('INSERT INTO admin (admin_id, admin_pass) VALUES (?, ?)');
-        $req->execute(array($admin_username, $hash_pass));
-
-        rmdir(dirname(__FILE__) . '/sql');
-        printSuccess('Well done, OpenVPN-Admin is installed. Redirection.');
-        header( "refresh:3;url=index.php?admin" );
+        @unlink($sql_file);
+        updateSchema($bdd, $mv);
       }
-      // Print the installation form
-      else {    
-        require(dirname(__FILE__) . '/include/html/menu.php');
-        require(dirname(__FILE__) . '/include/html/form/installation.php');
-      }
+      $bdd->prepare('INSERT INTO admin (admin_id, admin_pass, admin_role) VALUES (?, ?, ?)')
+          ->execute([$_POST['admin_username'], hashPass($_POST['admin_pass']), 'super-admin']);
+      @rmdir(dirname(__FILE__) . '/sql');
+      printSuccess('Installation complete! Redirecting to admin panel…');
+      header('refresh:3;url=index.php?admin');
       exit(-1);
     }
+    require(dirname(__FILE__) . '/include/html/menu.php');
+    require(dirname(__FILE__) . '/include/html/form/installation.php');
+    exit(-1);
+  }
 
-    // --------------- UNIFIED LOGIN / CONFIG ---------------
-    if(!isset($_GET['admin']) || !isset($_SESSION['admin_id'])) {
-      if(isset($error) && $error == true)
-        printError('Login error');
+  // ─── PUBLIC CONFIG DOWNLOAD / LOGIN ───
+  if (!$isAdmin) {
+    if (isset($error) && $error) printError('Invalid username or password.');
+    require(dirname(__FILE__) . '/include/html/menu.php');
+    echo '<div class="container py-4">';
+    require(dirname(__FILE__) . '/include/html/form/login.php');
+    echo '<hr class="my-4"/>';
+    require(dirname(__FILE__) . '/include/html/form/configuration.php');
+    echo '</div>';
+    // Scripts at end
+    echo '<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>';
+    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>';
+    echo '</body></html>';
+    exit;
+  }
 
-      require(dirname(__FILE__) . '/include/html/form/login.php');
-    }
+  // ─── ADMIN PANEL ───
+?>
 
-    // --------------- GRIDS ---------------
-    else{
-      $page = isset($_GET['page']) ? $_GET['page'] : 'users';
-      $page_titles = array(
-        'users' => 'OpenVPN Users',
-        'logs' => 'OpenVPN Logs',
-        'admins' => 'Web Admins',
-        'configs' => 'Configs',
-        'filename' => 'File Name',
-      );
-      $topbar_title = isset($page_titles[$page]) ? $page_titles[$page] : 'OpenVPN Users';
-  ?>
-    <div class="admin-wrapper">
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <a href="index.php?admin" style="color:inherit;text-decoration:none"><span class="glyphicon glyphicon-lock"></span> OpenVPN Admin</a>
-        </div>
-        <ul class="sidebar-nav" id="admin-sidebar-nav">
-          <li class="<?= $page=='users'?'active':'' ?>"><a href="index.php?admin&page=users"><span class="glyphicon glyphicon-user"></span> OpenVPN Users</a></li>
-          <li class="<?= $page=='logs'?'active':'' ?>"><a href="index.php?admin&page=logs"><span class="glyphicon glyphicon-book"></span> OpenVPN Logs</a></li>
-          <li class="<?= $page=='admins'?'active':'' ?>"><a href="index.php?admin&page=admins"><span class="glyphicon glyphicon-king"></span> Web Admins</a></li>
-          <li class="<?= $page=='configs'?'active':'' ?>"><a href="index.php?admin&page=configs"><span class="glyphicon glyphicon-edit"></span> Configs</a></li>
-          <li class="<?= $page=='filename'?'active':'' ?>"><a href="index.php?admin&page=filename"><span class="glyphicon glyphicon-file"></span> File Name</a></li>
-        </ul>
-        <div class="sidebar-footer">
-          Signed in as <strong><?php echo htmlspecialchars($_SESSION['admin_id']); ?></strong>
-        </div>
-      </aside>
-      <div class="main-content">
-        <div class="topbar">
-          <span class="topbar-title"><?= htmlspecialchars($topbar_title) ?></span>
-          <div>
-            <a href="index.php?admin_configuration_get"><button class="btn btn-sm btn-default">Get Config File</button></a>
-            <a href="index.php"><button class="btn btn-sm btn-default">Configurations</button></a>
-            <a href="index.php?logout"><button class="btn btn-sm btn-danger">Logout <span class="glyphicon glyphicon-off"></span></button></a>
-          </div>
-        </div>
-  <?php
-      require(dirname(__FILE__) . '/include/html/grids.php');
-  ?>
+<div class="admin-wrapper">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <i class="bi bi-shield-lock"></i> OpenVPN Admin
+    </div>
+    <nav class="sidebar-nav">
+      <ul>
+        <li class="nav-section-label">Overview</li>
+        <li class="<?= $page==='dashboard'?'active':'' ?>">
+          <a href="index.php?admin&page=dashboard">
+            <i class="bi bi-activity"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-section-label">Management</li>
+        <li class="<?= $page==='users'?'active':'' ?>">
+          <a href="index.php?admin&page=users">
+            <i class="bi bi-people"></i> Users
+          </a>
+        </li>
+        <li class="<?= $page==='logs'?'active':'' ?>">
+          <a href="index.php?admin&page=logs">
+            <i class="bi bi-journal-text"></i> Logs
+          </a>
+        </li>
+        <li class="<?= $page==='certificates'?'active':'' ?>">
+          <a href="index.php?admin&page=certificates">
+            <i class="bi bi-patch-check"></i> Certificates
+          </a>
+        </li>
+        <li class="nav-section-label">Administration</li>
+        <li class="<?= $page==='admins'?'active':'' ?>">
+          <a href="index.php?admin&page=admins">
+            <i class="bi bi-person-gear"></i> Admins
+          </a>
+        </li>
+        <li class="<?= $page==='configs'?'active':'' ?>">
+          <a href="index.php?admin&page=configs">
+            <i class="bi bi-file-earmark-code"></i> Configs
+          </a>
+        </li>
+        <li class="<?= $page==='filename'?'active':'' ?>">
+          <a href="index.php?admin&page=filename">
+            <i class="bi bi-file-earmark-text"></i> File Name
+          </a>
+        </li>
+        <li class="<?= $page==='settings'?'active':'' ?>">
+          <a href="index.php?admin&page=settings">
+            <i class="bi bi-sliders"></i> Settings
+          </a>
+        </li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-person-circle"></i>
+        <span class="flex-grow-1 text-truncate"><?= htmlspecialchars($_SESSION['admin_id']) ?></span>
+        <?php if ($adminRole === 'super-admin'): ?>
+          <span class="badge bg-primary" title="Super Admin">SA</span>
+        <?php else: ?>
+          <span class="badge bg-secondary" title="Read Only">RO</span>
+        <?php endif; ?>
       </div>
     </div>
-  <?php
-    }
-  ?>  
-     <div id="message-stage">
-        <!-- used to display application messages (failures / status-notes) to the user -->
-     </div>
-  </body>
+  </aside>
+
+  <!-- Main content -->
+  <div class="main-content">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebar-toggle">
+          <i class="bi bi-list"></i>
+        </button>
+        <span class="topbar-title"><?= htmlspecialchars($topbar_title) ?></span>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="index.php?admin_configuration_get" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-download me-1"></i>Shared Config
+        </a>
+        <a href="index.php" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-people me-1"></i>User Portal
+        </a>
+        <a href="index.php?logout" class="btn btn-sm btn-danger">
+          <i class="bi bi-box-arrow-right me-1"></i>Logout
+        </a>
+      </div>
+    </div>
+
+    <!-- Page content -->
+    <?php
+      require(dirname(__FILE__) . '/include/html/grids.php');
+    ?>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container"></div>
+
+<!-- JS -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/bootstrap-table.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/extensions/filter-control/bootstrap-table-filter-control.min.js"></script>
+<script>
+  // Expose role and page to JS
+  window.ADMIN_ROLE = <?= json_encode($adminRole) ?>;
+  window.CURRENT_PAGE = <?= json_encode($page) ?>;
+</script>
+<script src="js/grids.js"></script>
+
+</body>
 </html>

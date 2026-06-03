@@ -1,449 +1,571 @@
 $(function () {
-  "use strict";
+  'use strict';
 
-  // ------------------------- GENERIC STUFF ------------------------------
-  window.printStatus = function(msg, alert_type, bootstrap_icon) {
-    alert_type = alert_type || 'warning';
-    bootstrap_icon = bootstrap_icon || '';
-    $('#message-stage').empty()
-        .append(
-           $(document.createElement('div'))
-           .addClass('alert alert-'+alert_type)
-           .html(bootstrap_icon?'<i class="stauts-icon glyphicon glyphicon-'+bootstrap_icon+'"></i>':'')
-           .append(msg)
-           .hide().fadeIn().delay(2000).fadeOut()
-        );
-  };
-
-  // ------------------------- GLOBAL definitions -------------------------
   var gridsUrl = 'include/grids.php';
+  var isSuperAdmin = (window.ADMIN_ROLE === 'super-admin');
+  var currentPage = window.CURRENT_PAGE || 'dashboard';
 
-  function deleteFormatter() {
-    return "<span class='glyphicon glyphicon-remove action'></span>";
+  // ─── TOAST ───
+  function toast(msg, type) {
+    type = type || 'secondary';
+    var icons = { success: 'check-circle-fill', danger: 'x-circle-fill', warning: 'exclamation-triangle-fill', secondary: 'info-circle-fill' };
+    var icon  = icons[type] || icons.secondary;
+    var id    = 'toast-' + Date.now();
+    var html  = '<div id="' + id + '" class="toast align-items-center text-bg-' + type + ' border-0" role="alert">'
+              + '<div class="d-flex"><div class="toast-body"><i class="bi bi-' + icon + ' me-2"></i>' + msg + '</div>'
+              + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>';
+    $('#toast-container').append(html);
+    var el = document.getElementById(id);
+    var t  = new bootstrap.Toast(el, { delay: 3500 });
+    t.show();
+    el.addEventListener('hidden.bs.toast', function() { el.remove(); });
   }
 
-  function refreshTable($table) {
-    $table.bootstrapTable('refresh');
+  function onError(xhr) {
+    var msg = 'Request failed';
+    try { var j = JSON.parse(xhr.responseText); if (j.error) msg = j.error; } catch(e) {}
+    toast(msg, 'danger');
   }
 
-  function onAjaxError(xhr, textStatus, error) {
-    console.error(error);
-    printStatus('Error: ' + textStatus, 'danger', 'warning-sign');
+  function fmtBytes(n) {
+    n = parseInt(n) || 0;
+    if (n >= 1073741824) return (n/1073741824).toFixed(2) + ' GB';
+    if (n >= 1048576)    return (n/1048576).toFixed(1)    + ' MB';
+    if (n >= 1024)       return Math.round(n/1024)        + ' KB';
+    return n + ' B';
   }
 
-  // Option E: toggle switch instead of raw checkbox
-  function toggleFormatter(value, row, index) {
+  // ─── SIDEBAR MOBILE TOGGLE ───
+  $('#sidebar-toggle').on('click', function() {
+    $('#sidebar').toggleClass('open');
+  });
+
+  // ─── STATS ───
+  function loadStats() {
+    $.getJSON(gridsUrl, { select: 'stats' }, function(d) {
+      $('#stat-total-users').text(d.total_users);
+      $('#stat-online-now').text(d.online_now);
+      $('#stat-disabled').text(d.disabled);
+      $('#stat-log-entries').text(d.log_entries);
+    });
+  }
+  loadStats();
+  setInterval(function() {
+    loadStats();
+    if (currentPage === 'dashboard') loadDashboard();
+    if (currentPage === 'users')     $userTable.bootstrapTable('refresh');
+  }, 10000);
+
+
+  // ════════════════════ DASHBOARD ════════════════════
+
+  function loadDashboard() {
+    $.getJSON(gridsUrl, { select: 'dashboard' }, function(data) {
+      var $tbody = $('#dashboard-tbody');
+      $tbody.empty();
+      if (data.error) {
+        $('#dashboard-no-status').removeClass('d-none').text(data.error || 'Status file not found.');
+        $tbody.html('<tr><td colspan="5" class="text-center text-muted py-4">No data available.</td></tr>');
+        return;
+      }
+      $('#dashboard-no-status').addClass('d-none');
+      if (!data.clients || data.clients.length === 0) {
+        $tbody.html('<tr><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-wifi-off me-2"></i>No active connections.</td></tr>');
+        return;
+      }
+      data.clients.forEach(function(c) {
+        $tbody.append(
+          '<tr>' +
+          '<td><i class="bi bi-person-circle me-1 text-success"></i>' + c.common_name + '</td>' +
+          '<td><code>' + c.real_address + '</code></td>' +
+          '<td>' + c.rx_human + '</td>' +
+          '<td>' + c.tx_human + '</td>' +
+          '<td><small>' + c.connected_since + '</small></td>' +
+          '</tr>'
+        );
+      });
+    }).fail(function() {
+      $('#dashboard-no-status').removeClass('d-none');
+    });
+  }
+
+  if (currentPage === 'dashboard') loadDashboard();
+
+  $('#btn-refresh-dashboard').on('click', function() {
+    $('#dashboard-tbody').html('<tr><td colspan="5" class="text-center text-muted py-4">Loading…</td></tr>');
+    loadDashboard();
+    loadStats();
+    toast('Refreshed', 'secondary');
+  });
+
+
+  // ════════════════════ USERS ════════════════════
+
+  var $userTable = $('#table-users');
+  var $modalUserAdd = new bootstrap.Modal('#modal-user-add');
+  var $modalUserEdit = new bootstrap.Modal('#modal-user-edit');
+  var $modalResetPass = new bootstrap.Modal('#modal-reset-pass');
+
+  function onlineFormatter(val) {
+    return parseInt(val) === 1
+      ? '<span class="led led-green" title="Online"></span>'
+      : '<span class="led led-red" title="Offline"></span>';
+  }
+
+  function enableFormatter(val) {
     return '<label class="toggle-switch">' +
-      '<input type="checkbox" ' + (parseInt(value) === 1 ? 'checked' : '') + ' />' +
-      '<span class="toggle-slider"></span>' +
-      '</label>';
+      '<input type="checkbox" class="enable-toggle" ' + (parseInt(val) === 1 ? 'checked' : '') + '/>' +
+      '<span class="toggle-slider"></span></label>';
   }
 
-  // Option E: masked password + Reset button
-  function passFormatter(value, row) {
-    return '<span class="pass-mask">\u2022\u2022\u2022\u2022\u2022\u2022</span>' +
-      '<button class="btn btn-xs btn-warning reset-pass-btn" data-user-id="' + row.user_id + '">Reset</button>';
+  function passFormatter(val, row) {
+    if (!isSuperAdmin) return '<span class="pass-mask">••••••</span>';
+    return '<span class="pass-mask">••••••</span>' +
+      '<button class="btn btn-xs btn-warning btn-sm reset-pass-btn" data-user-id="' + row.user_id + '" style="padding:1px 6px;font-size:0.75em">Reset</button>';
   }
 
-  function adminPassFormatter(value, row) {
-    return '<span class="pass-mask">\u2022\u2022\u2022\u2022\u2022\u2022</span>' +
-      '<button class="btn btn-xs btn-warning reset-pass-btn" data-admin-id="' + row.admin_id + '">Reset</button>';
-  }
-
-  function LEDIndicatorFormatter(value, row, index) {
-    return '<div class="' + (parseInt(value) === 1 ? 'mini-led-green' : 'mini-led-red') + '"></div>';
-  }
-
-  function bytesStyle(value, row, index, field) {
-    if (value.includes("KB") === true) {
-      return {
-        classes: 'text-nowrap another-class',
-        css: {"background-color": "rgba(0, 100, 0, 0.3);"}
-      };
-    } else {
-      return {
-        classes: 'text-nowrap another-class',
-        css: {"background-color": "rgba(100, 0, 0, 0.3);"}
-      };
+  function userActionsFormatter(val, row) {
+    var html = '';
+    if (isSuperAdmin) {
+      html += '<button class="btn btn-xs btn-sm btn-outline-primary me-1 user-edit-btn" data-id="' + row.user_id + '" '
+            + 'data-mail="' + (row.user_mail||'') + '" data-phone="' + (row.user_phone||'') + '" '
+            + 'data-start="' + (row.user_start_date||'') + '" data-end="' + (row.user_end_date||'') + '" '
+            + 'style="padding:1px 6px;font-size:0.75em" title="Edit"><i class="bi bi-pencil"></i></button>';
+      html += '<button class="btn btn-xs btn-sm btn-outline-danger user-del-btn" data-id="' + row.user_id + '" '
+            + 'style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>';
     }
+    return html || '<span class="text-muted small">–</span>';
   }
 
-  // Option E: highlight rows where end_date is in the past
   function userRowStyle(row) {
     if (row.user_end_date) {
       var today = new Date().toISOString().split('T')[0];
-      if (row.user_end_date < today) {
-        return { classes: 'user-expired' };
-      }
+      if (row.user_end_date < today) return { classes: 'user-expired' };
     }
     return {};
   }
 
-  // ------------------------- USERS definitions -------------------------
-  var $userTable = $('#table-users');
-  var $modalUserAdd = $('#modal-user-add');
-  var $userAddSave = $modalUserAdd.find('#modal-user-add-save');
-
-  function addUser(username, password) {
-    $.ajax({
-      url: gridsUrl,
-      method: 'POST',
-      data: {
-        add_user: true,
-        user_id: username,
-        user_pass: password
-      },
-      success: function() {
-        refreshTable($userTable);
-        loadStats();
-      },
-      error: onAjaxError
-    });
-  }
-
-  function deleteUser(user_id) {
-    $.ajax({
-      url: gridsUrl,
-      data: {
-        del_user: true,
-        del_user_id: user_id
-      },
-      method: 'POST',
-      success: function() {
-        refreshTable($userTable);
-        loadStats();
-      },
-      error: onAjaxError
-    });
-  }
-
-  function genericSetField(field, new_value, pk) {
-    $.ajax({
-      url: gridsUrl,
-      data: {
-        set_user: true,
-        name: field,
-        value: new_value,
-        pk: pk
-      },
-      method: 'POST',
-      success: function() {
-        refreshTable($userTable);
-        loadStats();
-      },
-      error: onAjaxError
-    });
-  }
-
-  var userEditable = {
-    url: gridsUrl,
-    params: function (params) {
-      params.set_user = true;
-      return params;
-    },
-    success: function () {
-      refreshTable($userTable);
-    }
-  };
-
-  function updateConfig(config_file, config_content) {
-    $.ajax({
-      url: gridsUrl,
-      data: {
-        update_config: true,
-        config_file: config_file,
-        config_content: config_content
-      },
-      success: function(res) {
-        printStatus(
-          res.config_success ? 'Config Successfully updated!' : 'An error occured while trying to save the updated config.',
-          res.config_success ? 'success' : 'danger',
-          res.config_success ? 'ok' : 'warning-sign'
-        );
-      },
-      dataType: 'json',
-      method: 'POST',
-      error: onAjaxError
-    });
-  }
-
-  // ES 2015 so be prudent
-  if (typeof Object.assign == 'function') {
-    var userDateEditable = Object.assign({ type: 'date', placement: 'bottom' }, userEditable);
-  } else {
-    console.warn('Your browser does not support Object.assign. You will not be able to modify the date inputs.');
-  }
-
-  // ------------------------- ADMIN definitions -------------------------
-  var $adminTable = $('#table-admins');
-  var $modalAdminAdd = $('#modal-admin-add');
-  var $adminAddSave = $modalAdminAdd.find('#modal-admin-add-save');
-
-  function addAdmin(username, password) {
-    $.ajax({
-      url: gridsUrl,
-      method: 'POST',
-      data: {
-        add_admin: true,
-        admin_id: username,
-        admin_pass: password
-      },
-      success: function() {
-        refreshTable($adminTable);
-      },
-      error: onAjaxError
-    });
-  }
-
-  function deleteAdmin(admin_id) {
-    $.ajax({
-      url: gridsUrl,
-      data: {
-        del_admin: true,
-        del_admin_id: admin_id
-      },
-      method: 'POST',
-      success: function() {
-        refreshTable($adminTable);
-      },
-      error: onAjaxError
-    });
-  }
-
-  function genericSetAdminField(field, new_value, pk) {
-    $.ajax({
-      url: gridsUrl,
-      data: {
-        set_admin: true,
-        name: field,
-        value: new_value,
-        pk: pk
-      },
-      method: 'POST',
-      success: function() {
-        refreshTable($adminTable);
-      },
-      error: onAjaxError
-    });
-  }
-
-  var adminEditable = {
-    url: gridsUrl,
-    params: function (params) {
-      params.set_admin = true;
-      return params;
-    },
-    success: function () {
-      refreshTable($adminTable);
-    }
-  };
-
-  // ------------------------- LOGS definitions -------------------------
-  var $logTable = $('#table-logs');
-
-  // ------------------------- DELETE CONFIRM MODAL (Option E) -------------------------
-  var $confirmModal = $('#modal-confirm-delete');
-  var pendingDeleteType = null;
-  var pendingDeleteId = null;
-
-  function confirmDelete(type, id) {
-    pendingDeleteType = type;
-    pendingDeleteId = id;
-    $('#modal-confirm-delete-name').text(id);
-    $confirmModal.modal('show');
-  }
-
-  $('#modal-confirm-delete-ok').on('click', function() {
-    if (pendingDeleteType === 'user') {
-      deleteUser(pendingDeleteId);
-    } else if (pendingDeleteType === 'admin') {
-      deleteAdmin(pendingDeleteId);
-    }
-    $confirmModal.modal('hide');
-    pendingDeleteType = null;
-    pendingDeleteId = null;
-  });
-
-  // ------------------------- RESET PASSWORD MODAL (Option E) -------------------------
-  var $resetPassModal = $('#modal-reset-pass');
-
-  $(document).on('click', '.reset-pass-btn', function() {
-    var userId = $(this).data('user-id');
-    var adminId = $(this).data('admin-id');
-    if (userId) {
-      $resetPassModal.data('reset-type', 'user').data('reset-id', userId);
-    } else if (adminId) {
-      $resetPassModal.data('reset-type', 'admin').data('reset-id', adminId);
-    }
-    $resetPassModal.modal('show');
-    $('#modal-reset-pass-input').val('');
-  });
-
-  $('#modal-reset-pass-save').on('click', function() {
-    var type = $resetPassModal.data('reset-type');
-    var id = $resetPassModal.data('reset-id');
-    var newPass = $('#modal-reset-pass-input').val();
-    if (newPass) {
-      if (type === 'admin') {
-        genericSetAdminField('admin_pass', newPass, id);
-      } else {
-        genericSetField('user_pass', newPass, id);
-      }
-    }
-    $resetPassModal.modal('hide');
-  });
-
-  // ------------------------- STATS (Option B) -------------------------
-  function loadStats() {
-    $.getJSON(gridsUrl, { select: 'stats' }, function(data) {
-      $('#stat-total-users').text(data.total_users);
-      $('#stat-online-now').text(data.online_now);
-      $('#stat-disabled').text(data.disabled);
-      $('#stat-log-entries').text(data.log_entries);
-    });
-  }
-
-  loadStats();
-
-  // Auto-refresh stats and user table every 5 seconds
-  setInterval(function() {
-    loadStats();
-    refreshTable($userTable);
-  }, 5000);
-
-  // -------------------- USERS --------------------
-
   $userTable.bootstrapTable({
     url: gridsUrl,
     sortable: false,
-    checkboxHeader: false,
     rowStyle: userRowStyle,
-    queryParams: function (params) {
-      params.select = 'user';
-      return params;
-    },
-    idField: 'user_id',
+    queryParams: function(p) { p.select = 'user'; return p; },
     columns: [
-      { title: "ID", field: "user_id", editable: userEditable },
-      { title: "Pass", field: "user_pass", formatter: passFormatter },
-      { title: "Mail", field: "user_mail", editable: userEditable },
-      { title: "Phone", field: "user_phone", editable: userEditable },
+      { title: 'Username',   field: 'user_id' },
+      { title: 'Password',   field: 'user_pass',       formatter: passFormatter },
+      { title: 'Email',      field: 'user_mail' },
+      { title: 'Phone',      field: 'user_phone' },
+      { title: 'Online',     field: 'user_online',     formatter: onlineFormatter, align: 'center' },
       {
-        title: "Online",
-        field: "user_online",
-        formatter: LEDIndicatorFormatter
-      },
-      {
-        title: "Enabled",
-        field: "user_enable",
-        formatter: toggleFormatter,
+        title: 'Enabled', field: 'user_enable', align: 'center',
+        formatter: enableFormatter,
         events: {
-          'change input': function (e, value, row) {
-            genericSetField('user_enable', e.target.checked ? '1' : '0', row.user_id);
+          'change input.enable-toggle': function(e, val, row) {
+            if (!isSuperAdmin) return;
+            $.post(gridsUrl, { set_user: 1, name: 'user_enable', value: e.target.checked ? '1' : '0', pk: row.user_id },
+              function() { loadStats(); }, 'json').fail(onError);
           }
         }
       },
-      { title: "Start Date", field: "user_start_date", editable: userDateEditable },
-      { title: "End Date", field: "user_end_date", editable: userDateEditable },
-      {
-        title: 'Delete',
-        field: "user_del",
-        formatter: deleteFormatter,
-        events: {
-          'click .glyphicon': function (e, value, row) {
-            confirmDelete('user', row.user_id);
-          }
-        }
-      }
+      { title: 'Start',      field: 'user_start_date' },
+      { title: 'End',        field: 'user_end_date' },
+      { title: '',           field: 'actions', formatter: userActionsFormatter, align: 'right' },
     ]
   });
 
-  $userAddSave.on('click', function () {
-    var $usernameInput = $modalUserAdd.find('input[name=username]');
-    var $passwordInput = $modalUserAdd.find('input[name=password]');
-    addUser($usernameInput.val(), $passwordInput.val());
-    $modalUserAdd.modal('hide');
+  // Add user
+  $('#modal-user-add-save').on('click', function() {
+    var id   = $('#modal-user-add-username').val().trim();
+    var pass = $('#modal-user-add-password').val();
+    var mail = $('#modal-user-add-mail').val().trim();
+    if (!id || !pass) { toast('Username and password required.', 'warning'); return; }
+    $.post(gridsUrl, { add_user: 1, user_id: id, user_pass: pass, user_mail: mail }, function() {
+      $modalUserAdd.hide();
+      $userTable.bootstrapTable('refresh');
+      loadStats();
+      toast('User added.', 'success');
+    }, 'json').fail(onError);
+  });
+
+  // Edit user
+  $(document).on('click', '.user-edit-btn', function() {
+    var $btn = $(this);
+    $('#edit-user-pk').val($btn.data('id'));
+    $('#edit-user-mail').val($btn.data('mail'));
+    $('#edit-user-phone').val($btn.data('phone'));
+    $('#edit-user-start').val($btn.data('start'));
+    $('#edit-user-end').val($btn.data('end'));
+    $modalUserEdit.show();
+  });
+
+  $('#modal-user-edit-save').on('click', function() {
+    var pk    = $('#edit-user-pk').val();
+    var mail  = $('#edit-user-mail').val();
+    var phone = $('#edit-user-phone').val();
+    var start = $('#edit-user-start').val();
+    var end   = $('#edit-user-end').val();
+    var reqs  = [
+      $.post(gridsUrl, { set_user: 1, name: 'user_mail',       value: mail,  pk: pk }),
+      $.post(gridsUrl, { set_user: 1, name: 'user_phone',      value: phone, pk: pk }),
+      $.post(gridsUrl, { set_user: 1, name: 'user_start_date', value: start, pk: pk }),
+      $.post(gridsUrl, { set_user: 1, name: 'user_end_date',   value: end,   pk: pk }),
+    ];
+    $.when.apply($, reqs).done(function() {
+      $modalUserEdit.hide();
+      $userTable.bootstrapTable('refresh');
+      toast('User updated.', 'success');
+    }).fail(onError);
+  });
+
+  // Delete user
+  var _pendingDeleteType = null, _pendingDeleteId = null;
+  var $confirmModal = new bootstrap.Modal('#modal-confirm-delete');
+
+  $(document).on('click', '.user-del-btn', function() {
+    _pendingDeleteType = 'user';
+    _pendingDeleteId   = $(this).data('id');
+    $('#modal-confirm-delete-name').text(_pendingDeleteId);
+    $confirmModal.show();
+  });
+
+  // Reset password
+  $(document).on('click', '.reset-pass-btn', function() {
+    var userId  = $(this).data('user-id');
+    var adminId = $(this).data('admin-id');
+    $('#modal-reset-pass-input').val('');
+    if (userId)  $('#modal-reset-pass').data('type', 'user').data('id', userId);
+    if (adminId) $('#modal-reset-pass').data('type', 'admin').data('id', adminId);
+    $modalResetPass.show();
+  });
+
+  $('#modal-reset-pass-save').on('click', function() {
+    var type = $('#modal-reset-pass').data('type');
+    var id   = $('#modal-reset-pass').data('id');
+    var pass = $('#modal-reset-pass-input').val();
+    if (!pass) return;
+    var postData = type === 'admin'
+      ? { set_admin: 1, name: 'admin_pass', value: pass, pk: id }
+      : { set_user:  1, name: 'user_pass',  value: pass, pk: id };
+    $.post(gridsUrl, postData, function() {
+      $modalResetPass.hide();
+      toast('Password reset.', 'success');
+    }, 'json').fail(onError);
   });
 
 
-  // -------------------- ADMINS --------------------
+  // ════════════════════ LOGS ════════════════════
 
-  $adminTable.bootstrapTable({
-    url: gridsUrl,
-    sortable: false,
-    queryParams: function (params) {
-      params.select = 'admin';
-      return params;
-    },
-    idField: 'admin_id',
-    columns: [
-      { title: "ID", field: "admin_id", editable: adminEditable },
-      { title: "Pass", field: "admin_pass", formatter: adminPassFormatter },
-      { title: "Mail", field: "admin_mail", editable: adminEditable },
-      { title: "Phone", field: "admin_phone", editable: adminEditable },
-      {
-        title: "Enabled",
-        field: "admin_enable",
-        formatter: toggleFormatter,
-        events: {
-          'change input': function (e, value, row) {
-            genericSetAdminField('admin_enable', e.target.checked ? '1' : '0', row.admin_id);
-          }
-        }
-      },
-      {
-        title: 'Delete',
-        field: "admin_del",
-        formatter: deleteFormatter,
-        events: {
-          'click .glyphicon': function (e, value, row) {
-            confirmDelete('admin', row.admin_id);
-          }
-        }
-      }
-    ]
-  });
-
-  $adminAddSave.on('click', function () {
-    var $usernameInput = $modalAdminAdd.find('input[name=username]');
-    var $passwordInput = $modalAdminAdd.find('input[name=password]');
-    addAdmin($usernameInput.val(), $passwordInput.val());
-    $modalAdminAdd.modal('hide');
-  });
-
-  // -------------------- LOGS --------------------
+  var $logTable = $('#table-logs');
 
   $logTable.bootstrapTable({
     url: gridsUrl,
-    sortable: false,
     sidePagination: 'server',
     pagination: true,
-    queryParams: function (params) {
-      params.select = 'log';
-      return params;
-    },
+    queryParams: function(p) { p.select = 'log'; return p; },
     columns: [
-      { title: "User ID", field: "user_id", align: "center" },
-      { title: "Sessions", field: "sessions", align: "center" },
-      { title: "Total Received", field: "total_received", align: "center", cellStyle: bytesStyle },
-      { title: "Total Sent", field: "total_sent", align: "center", cellStyle: bytesStyle },
-      { title: "Last Connected", field: "last_connected", align: "center" }
+      { title: 'User',           field: 'user_id',        filterControl: 'input' },
+      { title: 'Sessions',       field: 'sessions',       align: 'center' },
+      { title: 'Total Received', field: 'total_received', align: 'center' },
+      { title: 'Total Sent',     field: 'total_sent',     align: 'center' },
+      { title: 'Last Connected', field: 'last_connected' },
     ]
   });
 
-  // watch the config textareas for changes and persist them if a change was made
-  $('textarea').keyup(function() {
-    $('#save-config-btn').removeClass('saved-success hidden').addClass('get-attention');
-  }).change(function() {
-    updateConfig($(this).data('config-file'), $(this).val());
-    $('#save-config-btn').removeClass('get-attention').addClass('saved-success');
+
+  // ════════════════════ ADMINS ════════════════════
+
+  var $adminTable = $('#table-admins');
+  var $modalAdminAdd = new bootstrap.Modal('#modal-admin-add');
+
+  function adminActionsFormatter(val, row) {
+    var html = '';
+    if (isSuperAdmin && row.admin_id !== (window._currentAdmin || '')) {
+      html += '<button class="btn btn-sm btn-outline-secondary me-1 admin-role-btn" '
+            + 'data-id="' + row.admin_id + '" data-role="' + row.admin_role + '" '
+            + 'style="padding:1px 6px;font-size:0.75em" title="Toggle Role">'
+            + '<i class="bi bi-arrow-repeat"></i></button>';
+      html += '<button class="btn btn-sm btn-outline-danger admin-del-btn" data-id="' + row.admin_id + '" '
+            + 'style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>';
+    }
+    return html || '<span class="text-muted small">–</span>';
+  }
+
+  function adminPassFormatter(val, row) {
+    if (!isSuperAdmin) return '<span class="pass-mask">••••••</span>';
+    return '<span class="pass-mask">••••••</span>' +
+      '<button class="btn btn-sm btn-warning reset-pass-btn" data-admin-id="' + row.admin_id + '" style="padding:1px 6px;font-size:0.75em">Reset</button>';
+  }
+
+  function roleFormatter(val) {
+    return val === 'super-admin'
+      ? '<span class="badge bg-primary">Super Admin</span>'
+      : '<span class="badge bg-secondary">Read Only</span>';
+  }
+
+  $adminTable.bootstrapTable({
+    url: gridsUrl,
+    queryParams: function(p) { p.select = 'admin'; return p; },
+    columns: [
+      { title: 'Username', field: 'admin_id' },
+      { title: 'Password', field: 'admin_pass',   formatter: adminPassFormatter },
+      { title: 'Email',    field: 'admin_mail' },
+      { title: 'Role',     field: 'admin_role',   formatter: roleFormatter, align: 'center' },
+      { title: '',         field: 'actions',       formatter: adminActionsFormatter, align: 'right' },
+    ]
   });
 
-}); // doc ready end
+  $('#modal-admin-add-save').on('click', function() {
+    var id   = $('#modal-admin-add-username').val().trim();
+    var pass = $('#modal-admin-add-password').val();
+    var mail = $('#modal-admin-add-mail').val().trim();
+    var role = $('#modal-admin-add-role').val();
+    if (!id || !pass) { toast('Username and password required.', 'warning'); return; }
+    $.post(gridsUrl, { add_admin: 1, admin_id: id, admin_pass: pass, admin_mail: mail, admin_role: role }, function() {
+      $modalAdminAdd.hide();
+      $adminTable.bootstrapTable('refresh');
+      toast('Admin added.', 'success');
+    }, 'json').fail(onError);
+  });
 
-// -------------------- HACKS --------------------
+  $(document).on('click', '.admin-del-btn', function() {
+    _pendingDeleteType = 'admin';
+    _pendingDeleteId   = $(this).data('id');
+    $('#modal-confirm-delete-name').text(_pendingDeleteId);
+    $confirmModal.show();
+  });
 
-// Autofocus for bootstrap modals
-$(document).on('shown.bs.modal', '.modal', function() {
-  $(this).find('[autofocus]').focus();
+  $(document).on('click', '.admin-role-btn', function() {
+    var id      = $(this).data('id');
+    var newRole = $(this).data('role') === 'super-admin' ? 'read-only' : 'super-admin';
+    $.post(gridsUrl, { set_admin: 1, name: 'admin_role', value: newRole, pk: id }, function() {
+      $adminTable.bootstrapTable('refresh');
+      toast('Role updated to ' + newRole + '.', 'success');
+    }, 'json').fail(onError);
+  });
+
+  // Shared confirm delete handler
+  $('#modal-confirm-delete-ok').on('click', function() {
+    if (_pendingDeleteType === 'user') {
+      $.post(gridsUrl, { del_user: 1, del_user_id: _pendingDeleteId }, function() {
+        $userTable.bootstrapTable('refresh');
+        loadStats();
+        toast('User deleted.', 'success');
+      }, 'json').fail(onError);
+    } else if (_pendingDeleteType === 'admin') {
+      $.post(gridsUrl, { del_admin: 1, del_admin_id: _pendingDeleteId }, function() {
+        $adminTable.bootstrapTable('refresh');
+        toast('Admin deleted.', 'success');
+      }, 'json').fail(onError);
+    }
+    $confirmModal.hide();
+    _pendingDeleteType = _pendingDeleteId = null;
+  });
+
+
+  // ════════════════════ CONFIGS ════════════════════
+
+  // Track dirty state per textarea
+  $(document).on('input', '.cfg-textarea', function() {
+    $(this).data('dirty', true);
+    $('#save-config-btn, #save-config-btn-fn').removeClass('d-none btn-secondary').addClass('btn-warning');
+  });
+
+  // Debounce save on blur
+  $(document).on('blur', '.cfg-textarea', function() {
+    if ($(this).data('dirty')) {
+      var $ta = $(this);
+      $.post(gridsUrl, { update_config: 1, config_file: $ta.data('config-file'), config_content: $ta.val() },
+        function(r) {
+          if (r.config_success) {
+            $ta.data('dirty', false);
+            $('#save-config-btn, #save-config-btn-fn').addClass('btn-success').removeClass('btn-warning');
+            setTimeout(function() {
+              $('#save-config-btn, #save-config-btn-fn').addClass('d-none btn-secondary').removeClass('btn-success btn-warning');
+            }, 2500);
+            toast('Config saved.', 'success');
+          } else {
+            toast('Failed to save config.', 'danger');
+          }
+        }, 'json'
+      ).fail(onError);
+    }
+  });
+
+
+  // ════════════════════ CERTIFICATES ════════════════════
+
+  function loadCertificates() {
+    $.getJSON(gridsUrl, { select: 'certificates' }, function(data) {
+      var $tbody = $('#cert-tbody');
+      $tbody.empty();
+      if (data.error) {
+        $('#cert-no-easyrsa').removeClass('d-none').html('<i class="bi bi-info-circle me-2"></i>' + data.error);
+        $tbody.html('<tr><td colspan="3" class="text-center text-muted py-4">EasyRSA not configured.</td></tr>');
+        return;
+      }
+      $('#cert-no-easyrsa').addClass('d-none');
+      if (!data.length) {
+        $tbody.html('<tr><td colspan="3" class="text-center text-muted py-4">No user certificates found.</td></tr>');
+        return;
+      }
+      data.forEach(function(c) {
+        var badgeClass = c.status === 'V' ? 'badge-cert-v' : (c.status === 'R' ? 'badge-cert-r' : 'badge-cert-e');
+        var actions = '';
+        if (c.status === 'V' && c.has_cert) {
+          actions += '<a href="include/grids.php?cert_download=1&cert_name=' + encodeURIComponent(c.cn) + '" class="btn btn-xs btn-sm btn-outline-primary me-1" style="padding:1px 6px;font-size:0.75em" title="Download .ovpn"><i class="bi bi-download"></i></a>';
+          actions += '<button class="btn btn-xs btn-sm btn-outline-secondary me-1 send-cfg-btn" data-cn="' + c.cn + '" style="padding:1px 6px;font-size:0.75em" title="Email config"><i class="bi bi-envelope"></i></button>';
+        }
+        if (isSuperAdmin && c.status === 'V') {
+          actions += '<button class="btn btn-xs btn-sm btn-outline-danger cert-revoke-btn" data-cn="' + c.cn + '" style="padding:1px 6px;font-size:0.75em" title="Revoke"><i class="bi bi-x-circle"></i></button>';
+        }
+        $tbody.append(
+          '<tr>' +
+          '<td>' + c.cn + '</td>' +
+          '<td><span class="badge ' + badgeClass + '">' + c.status_label + '</span></td>' +
+          '<td class="text-end">' + actions + '</td>' +
+          '</tr>'
+        );
+      });
+    }).fail(function() {
+      $('#cert-tbody').html('<tr><td colspan="3" class="text-center text-muted py-4">Could not load certificates.</td></tr>');
+    });
+  }
+
+  if (currentPage === 'certificates') loadCertificates();
+
+  // Generate cert
+  $('#modal-cert-gen-btn').on('click', function() {
+    var cn = $('#modal-cert-cn').val().trim();
+    if (!cn || !/^[a-zA-Z0-9._-]+$/.test(cn)) {
+      toast('Invalid common name.', 'warning');
+      return;
+    }
+    var $btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Generating…');
+    $('#cert-gen-output').removeClass('d-none');
+    $('#cert-gen-pre').text('Running easyrsa, this may take a moment…');
+
+    $.post(gridsUrl, { cert_generate: 1, cert_name: cn }, function(r) {
+      $('#cert-gen-pre').text(r.output || '(no output)');
+      if (r.ok) {
+        toast('Certificate generated for ' + cn, 'success');
+        loadCertificates();
+        setTimeout(function() { bootstrap.Modal.getInstance('#modal-cert-add').hide(); }, 2000);
+      } else {
+        toast('Generation failed. Check sudo access.', 'danger');
+        $('#cert-sudo-note').removeClass('d-none');
+      }
+    }, 'json').fail(onError).always(function() {
+      $btn.prop('disabled', false).html('<i class="bi bi-cpu me-1"></i>Generate');
+    });
+  });
+
+  // Revoke cert
+  $(document).on('click', '.cert-revoke-btn', function() {
+    var cn = $(this).data('cn');
+    if (!confirm('Revoke certificate for ' + cn + '? This cannot be undone.')) return;
+    $.post(gridsUrl, { cert_revoke: 1, cert_name: cn }, function(r) {
+      if (r.ok) { toast('Certificate revoked for ' + cn, 'success'); loadCertificates(); }
+      else       { toast('Revocation failed.', 'danger'); }
+    }, 'json').fail(onError);
+  });
+
+  // Send config via email
+  var $sendCfgModal = new bootstrap.Modal('#modal-send-config');
+  $(document).on('click', '.send-cfg-btn', function() {
+    $('#send-config-cn').val($(this).data('cn'));
+    $('#send-config-email').val('');
+    $sendCfgModal.show();
+  });
+
+  $('#send-config-btn').on('click', function() {
+    var cn    = $('#send-config-cn').val();
+    var email = $('#send-config-email').val().trim();
+    if (!email) { toast('Enter an email address.', 'warning'); return; }
+    $.post(gridsUrl, { send_config_email: 1, cert_name: cn, email_to: email }, function(r) {
+      if (r.ok) { $sendCfgModal.hide(); toast('Config emailed to ' + email, 'success'); }
+      else       { toast('Failed to send email: ' + (r.error||''), 'danger'); }
+    }, 'json').fail(onError);
+  });
+
+
+  // ════════════════════ SMTP SETTINGS ════════════════════
+
+  function loadSmtpSettings() {
+    $.getJSON(gridsUrl, { select: 'smtp' }, function(d) {
+      if (!d || d.error) return;
+      $('#smtp_host').val(d.smtp_host || '');
+      $('#smtp_port').val(d.smtp_port || 587);
+      $('#smtp_user').val(d.smtp_user || '');
+      $('#smtp_from').val(d.smtp_from || '');
+      $('#smtp_from_name').val(d.smtp_from_name || 'OpenVPN Admin');
+      $('#smtp_secure').val(d.smtp_secure || 'tls');
+      // notifications
+      $('#notify_connect').prop('checked',    !!parseInt(d.notify_connect));
+      $('#notify_disconnect').prop('checked', !!parseInt(d.notify_disconnect));
+      $('#notify_expiry').prop('checked',     !!parseInt(d.notify_expiry));
+    });
+  }
+
+  if (currentPage === 'settings') loadSmtpSettings();
+
+  $('#smtp-form').on('submit', function(e) {
+    e.preventDefault();
+    var $btn = $('#smtp-save-btn').prop('disabled', true);
+    var data = {
+      save_smtp:       1,
+      smtp_host:       $('#smtp_host').val(),
+      smtp_port:       $('#smtp_port').val(),
+      smtp_user:       $('#smtp_user').val(),
+      smtp_pass:       $('#smtp_pass').val(),
+      smtp_from:       $('#smtp_from').val(),
+      smtp_from_name:  $('#smtp_from_name').val(),
+      smtp_secure:     $('#smtp_secure').val(),
+      notify_connect:  $('#notify_connect').is(':checked') ? 1 : 0,
+      notify_disconnect: $('#notify_disconnect').is(':checked') ? 1 : 0,
+      notify_expiry:   $('#notify_expiry').is(':checked') ? 1 : 0,
+    };
+    $.post(gridsUrl, data, function() {
+      toast('SMTP settings saved.', 'success');
+    }, 'json').fail(onError).always(function() { $btn.prop('disabled', false); });
+  });
+
+  $('#notif-form').on('submit', function(e) {
+    e.preventDefault();
+    var $btn = $('#notif-save-btn').prop('disabled', true);
+    $.post(gridsUrl, {
+      save_smtp:         1,
+      notify_connect:    $('#notify_connect').is(':checked') ? 1 : 0,
+      notify_disconnect: $('#notify_disconnect').is(':checked') ? 1 : 0,
+      notify_expiry:     $('#notify_expiry').is(':checked') ? 1 : 0,
+    }, function() {
+      toast('Notification settings saved.', 'success');
+    }, 'json').fail(onError).always(function() { $btn.prop('disabled', false); });
+  });
+
+  $('#smtp-test-btn').on('click', function() {
+    var email = $('#smtp-test-email').val().trim();
+    if (!email) { toast('Enter a recipient email for the test.', 'warning'); return; }
+    var $btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+    $.post(gridsUrl, { test_smtp: 1, test_email: email }, function(r) {
+      if (r.ok) toast('Test email sent to ' + email, 'success');
+      else      toast('Failed: ' + (r.error||'check settings'), 'danger');
+    }, 'json').fail(onError).always(function() {
+      $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i>Send Test');
+    });
+  });
+
+
+  // ════════════════════ AUTOFOCUS IN MODALS ════════════════════
+
+  $(document).on('shown.bs.modal', '.modal', function() {
+    $(this).find('[autofocus]').focus();
+  });
+
+  // Clear cert gen output when modal reopened
+  $(document).on('show.bs.modal', '#modal-cert-add', function() {
+    $('#modal-cert-cn').val('');
+    $('#cert-gen-output').addClass('d-none');
+    $('#cert-gen-pre').text('');
+  });
+
 });

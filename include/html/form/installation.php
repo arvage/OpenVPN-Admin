@@ -1,36 +1,31 @@
-<div class="row">
-  <div class="col-md-4 col-md-offset-4">
-
-    <form id="install_form" method="POST" class="panel panel-default">
-
-      <div class="panel-heading">
-        <h3 class="panel-title">Installation</h3>
+<div class="row justify-content-center">
+  <div class="col-md-5 col-sm-8 col-11">
+    <div class="card shadow">
+      <div class="card-header py-3">
+        <h5 class="mb-0"><i class="bi bi-gear-fill me-2"></i>First-Time Installation</h5>
       </div>
-
-      <div class="panel-body">
-        <div class="form-group">
-          <label for="admin_username">Admin username:</label>
-          <input type="text" id="admin_username" name="admin_username" class="form-control" autofocus/>
-        </div>
-
-        <br /><br />
-
-        <div class="form-group">
-          <label for="admin_pass">Admin password:</label>
-          <input type="password" id="admin_pass" name="admin_pass" class="form-control" />
-        </div>
-
-        <div class="form-group">
-          <label for="repeat_admin_pass">Repeat the admin password:</label>
-          <input type="password" id="repeat_admin_pass" name="repeat_admin_pass" class="form-control" />
-        </div>
-
-        <br /><br />
-
-        <input id="install" name="install" type="submit" value="Install" class="btn btn-default" />
+      <div class="card-body p-4">
+        <p class="text-muted small mb-4">Create the initial administrator account to complete setup.</p>
+        <form id="install_form" method="POST">
+          <div class="mb-3">
+            <label for="admin_username" class="form-label">Admin Username</label>
+            <input type="text" id="admin_username" name="admin_username" class="form-control" autofocus autocomplete="username"/>
+          </div>
+          <div class="mb-3">
+            <label for="admin_pass" class="form-label">Admin Password</label>
+            <input type="password" id="admin_pass" name="admin_pass" class="form-control" autocomplete="new-password"/>
+          </div>
+          <div class="mb-4">
+            <label for="repeat_admin_pass" class="form-label">Confirm Password</label>
+            <input type="password" id="repeat_admin_pass" name="repeat_admin_pass" class="form-control" autocomplete="new-password"/>
+          </div>
+          <div class="d-grid">
+            <button id="install" name="install" type="submit" class="btn btn-success">
+              <i class="bi bi-check2-circle me-2"></i>Install
+            </button>
+          </div>
+        </form>
       </div>
-
-    </form>
-
+    </div>
   </div>
 </div>

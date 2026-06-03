@@ -13,3 +13,6 @@ mysql -h$HOST -P$PORT -u$USER -p$PASS $DB -e "UPDATE user SET user_online=0 WHER
 
 # We insert the deconnection datetime
 mysql -h$HOST -P$PORT -u$USER -p$PASS $DB -e "UPDATE log SET log_end_time=now(), log_received='$bytes_received', log_send='$bytes_sent' WHERE log_trusted_ip='$trusted_ip' AND log_trusted_port='$trusted_port' AND user_id='$common_name' AND log_end_time IS NULL"
+
+# Send disconnect notification email (non-blocking)
+php /var/www/openvpn-admin/include/notify.php disconnect "$common_name" 2>/dev/null &

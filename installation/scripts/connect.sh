@@ -28,3 +28,6 @@ mysql -h$HOST -P$PORT -u$USER -p$PASS $DB -e "INSERT INTO log (log_id, user_id, 
 
 # We specify that the user is online
 mysql -h$HOST -P$PORT -u$USER -p$PASS $DB -e "UPDATE user SET user_online=1 WHERE user_id='$common_name'"
+
+# Send connect notification email (non-blocking)
+php /var/www/openvpn-admin/include/notify.php connect "$common_name" "$trusted_ip" 2>/dev/null &
