@@ -422,7 +422,10 @@ if [ -f "$php_ini" ]; then
   fi
 fi
 
-# Enable required Apache modules
+# Disable any other PHP modules that may conflict, then enable the correct one
+for mod in $(apache2ctl -M 2>/dev/null | grep -oE 'php[0-9]+_[0-9]+' | tr '_' '.'); do
+  [ "$mod" != "php$php_version" ] && a2dismod "$mod" 2>/dev/null || true
+done
 a2enmod "php$php_version" 2>/dev/null || true
 a2enmod rewrite 2>/dev/null || true
 

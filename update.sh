@@ -152,9 +152,23 @@ else
   echo -e "${Yellow}Run manually: php $base_path/migration.php $www${NC}"
 fi
 
+# --- Ensure Apache is using the same PHP version as the CLI ------------------
+cli_php_ver=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+if [ -n "$cli_php_ver" ]; then
+  loaded_php_mod=$(apache2ctl -M 2>/dev/null | grep -oE 'php[0-9]+_[0-9]+' | head -1 | tr '_' '.')
+  if [ -n "$loaded_php_mod" ] && [ "$loaded_php_mod" != "php$cli_php_ver" ]; then
+    echo -e "${Yellow}Apache is using $loaded_php_mod but CLI PHP is $cli_php_ver. Switching...${NC}"
+    a2dismod "$loaded_php_mod" 2>/dev/null || true
+    a2enmod  "php$cli_php_ver" 2>/dev/null || true
+  elif [ -z "$loaded_php_mod" ]; then
+    # No PHP module loaded at all — enable the CLI version
+    a2enmod "php$cli_php_ver" 2>/dev/null || true
+  fi
+fi
+
 # --- Reload Apache to pick up updated PHP files -------------------------------
 echo -e "${Green}Reloading Apache...${NC}"
-systemctl reload apache2 2>/dev/null || systemctl restart apache2 2>/dev/null || true
+systemctl restart apache2 2>/dev/null || true
 
 # --- Restart OpenVPN if server.conf was changed -------------------------------
 if [ "$SERVER_CONF_CHANGED" = true ]; then
