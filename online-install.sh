@@ -42,7 +42,7 @@ echo -e "${Green}Detected OS: ${Red}$OS${NC}"
 # --- Suppress needrestart interactive prompts (Ubuntu 22+ only) ---------------
 NEEDRESTART_CONF="/etc/needrestart/needrestart.conf"
 if [ -f "$NEEDRESTART_CONF" ]; then
-  sed -i "s/#\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/g" "$NEEDRESTART_CONF" || true
+  sudo sed -i "s/#\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/g" "$NEEDRESTART_CONF" || true
 fi
 
 # --- Update package lists and install git -------------------------------------
