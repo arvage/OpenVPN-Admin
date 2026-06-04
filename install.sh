@@ -368,6 +368,9 @@ for file in $(find . -name "client.ovpn"); do
   sed -i "s/remote xxx\.xxx\.xxx\.xxx 1194/remote $public_ip $server_port/" "$file"
   sed -i "s/remote xxx\.xxx\.xxx\.xxx 443/remote $public_ip $server_port/"  "$file"
   [ "$openvpn_proto" = "udp" ] && sed -i "s/proto tcp-client/proto udp/" "$file"
+  # Keep compression in sync with server (comp-lzo is deprecated in OpenVPN 2.5+)
+  sed -i 's/^comp-lzo$/compress lz4-v2/' "$file"
+  sed -i 's/^compress lzo$/compress lz4-v2/' "$file"
   # Append inline CA and TLS-auth
   echo "<ca>"       >> "$file"; cat /etc/openvpn/ca.crt >> "$file"; echo "</ca>"       >> "$file"
   echo "<tls-auth>" >> "$file"; cat /etc/openvpn/ta.key >> "$file"; echo "</tls-auth>" >> "$file"

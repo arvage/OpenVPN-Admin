@@ -107,6 +107,15 @@ if [ -f "$SERVER_CONF" ] && command -v openvpn &>/dev/null; then
       SERVER_CONF_CHANGED=true
     fi
 
+    # Keep client configs in sync with server compression
+    while IFS= read -r -d '' file; do
+      if grep -qE '^(comp-lzo|compress lzo)$' "$file"; then
+        echo -e "${Green}Patching client config: $file -> compress lz4-v2${NC}"
+        sed -i 's/^comp-lzo$/compress lz4-v2/' "$file"
+        sed -i 's/^compress lzo$/compress lz4-v2/' "$file"
+      fi
+    done < <(find "$www/client-conf" -name "client.ovpn" -print0 2>/dev/null)
+
     # Add data-ciphers directive if only old cipher line is present
     if grep -q '^cipher AES-256-CBC' "$SERVER_CONF" && ! grep -q '^data-ciphers' "$SERVER_CONF"; then
       echo -e "${Green}Patching server.conf: adding data-ciphers for OpenVPN 2.5+${NC}"
