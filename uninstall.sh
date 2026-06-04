@@ -1,79 +1,176 @@
 #!/bin/bash
 
-print_help () {
-  echo -e "./uninstall.sh www_basedir"
-  echo -e "\tbase_dir: The place where the web application is in"
+# --- Colors -------------------------------------------------------------------
+NC='\033[0m'
+Red='\033[1;31m'
+Yellow='\033[0;33m'
+Green='\033[0;32m'
+Bold='\033[1m'
+
+# --- Help ---------------------------------------------------------------------
+print_help() {
+  echo -e "sudo ./uninstall.sh www_basedir"
+  echo -e "\twww_basedir: The directory where the web application is (e.g. /var/www)"
 }
 
-# Ensure to be root
+# --- Root check ---------------------------------------------------------------
 if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root"
-  exit
+  echo -e "${Red}Please run as root:${NC}"
+  echo -e "  sudo ./uninstall.sh /var/www"
+  exit 1
 fi
 
-# Ensure there are enought arguments
+# --- Args check ---------------------------------------------------------------
 if [ "$#" -ne 1 ]; then
   print_help
-  exit
+  exit 1
 fi
 
 www="$1/openvpn-admin"
 
 if [ ! -d "$www" ]; then
+  echo -e "${Red}Directory not found: $www${NC}"
   print_help
-  exit
+  exit 1
 fi
 
-# Get root pass (to delete the database and the user)
-mysql_root_pass=""
-status_code=1
+# --- Extract MySQL user from config.php ---------------------------------------
+mysql_user=$(sed -n "s/.*\\\$user = '\(.*\)';.*/\1/p" "$www/include/config.php" 2>/dev/null | head -1)
 
-while [ $status_code -ne 0 ]; do
-  read -p "MySQL root password: " -s mysql_root_pass; echo
-  echo "SHOW DATABASES" | mysql -u root --password="$mysql_root_pass" &> /dev/null
-  status_code=$?
-done
-
-mysql_user=$(sed -n "s/^.*user = '\(.*\)'.*$/\1/p" "$www/include/config.php")
-
-if [ "$mysql_user" = "" ]; then
-  echo "Can't find the MySQL user. Please ensure your include/config.php is well structured or report an issue"
-  exit
+if [ -z "$mysql_user" ]; then
+  echo -e "${Yellow}Warning: could not read MySQL username from $www/include/config.php${NC}"
+  echo -e "${Yellow}Database cleanup will be skipped.${NC}"
 fi
 
-echo -e "\033[1mAre you sure to completely delete OpenVPN configurations, the web application (with the MySQL user/database) and the iptables rules? (yes/*)\033[0m"
-read agree
+# --- Detect primary NIC (same logic as install.sh) ----------------------------
+primary_nic=$(ip route 2>/dev/null | awk '/^default/{print $5; exit}')
+if [ -z "$primary_nic" ]; then
+  primary_nic=$(ip link 2>/dev/null | awk -F': ' '/^[0-9]+: e/{print $2; exit}')
+fi
+
+# --- Confirmation prompt -------------------------------------------------------
+echo -e ""
+echo -e "${Bold}${Red}=== OpenVPN-Admin Uninstaller ===${NC}"
+echo -e ""
+echo -e "This will permanently remove:"
+echo -e "  ${Red}*${NC} OpenVPN service, keys and configuration"
+echo -e "  ${Red}*${NC} Web application at ${Yellow}$www${NC}"
+[ -n "$mysql_user" ] && \
+echo -e "  ${Red}*${NC} MySQL database ${Yellow}openvpn-admin${NC} and user ${Yellow}$mysql_user${NC}"
+echo -e "  ${Red}*${NC} Apache virtual host (openvpn)"
+echo -e "  ${Red}*${NC} iptables NAT rules (NIC: ${Yellow}${primary_nic:-unknown}${NC})"
+echo -e "  ${Red}*${NC} IP forwarding sysctl settings"
+echo -e "  ${Red}*${NC} Log directory ${Yellow}/var/log/openvpn/${NC}"
+echo -e "  ${Red}*${NC} sudoers entry for easyrsa"
+echo -e ""
+echo -e "${Bold}Type 'yes' to confirm, anything else to abort:${NC}"
+read -r agree </dev/tty
 
 if [ "$agree" != "yes" ]; then
-  exit
+  echo "Aborted."
+  exit 0
 fi
 
-# MySQL delete
-echo "DROP USER $mysql_user@localhost" | mysql -u root --password="$mysql_root_pass"
-echo "DROP DATABASE \`openvpn-admin\`" | mysql -u root --password="$mysql_root_pass"
+echo -e ""
 
-# Files delete (openvpn confs/keys + web application)
-rm -r /etc/openvpn/easy-rsa/
-rm -r /etc/openvpn/{ccd,scripts,server.conf,ca.crt,ta.key,server.crt,server.key,dh*.pem}
-rm -r "$www"
+# --- Stop and disable OpenVPN service -----------------------------------------
+echo -e "${Green}Stopping OpenVPN service...${NC}"
+systemctl stop   openvpn@server 2>/dev/null || true
+systemctl disable openvpn@server 2>/dev/null || true
 
-# Remove rooting rules
-echo 0 > "/proc/sys/net/ipv4/ip_forward"
-sed -i '/net.ipv4.ip_forward = 1/d' '/etc/sysctl.conf'
+# --- MySQL / MariaDB cleanup --------------------------------------------------
+if [ -n "$mysql_user" ]; then
+  echo -e "${Green}Removing database and user...${NC}"
 
-iptables -D FORWARD -i tun0 -j ACCEPT
-iptables -D FORWARD -o tun0 -j ACCEPT
-iptables -D OUTPUT -o tun0 -j ACCEPT
+  # Try socket auth first (default on modern MySQL/MariaDB), then prompt for password
+  MYSQL_AUTH=()
+  if ! mysql -u root -e "SELECT 1" &>/dev/null; then
+    while true; do
+      read -p "MySQL root password: " -s mysql_root_pass; echo
+      if mysql -u root --password="$mysql_root_pass" -e "SELECT 1" &>/dev/null; then
+        MYSQL_AUTH=(--password="$mysql_root_pass")
+        break
+      fi
+      echo -e "${Red}Wrong password, try again.${NC}"
+    done
+  fi
 
-iptables -D FORWARD -i tun0 -o eth0 -j ACCEPT
-iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
-iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
-iptables -t nat -D POSTROUTING -s 10.8.0.2/24 -o eth0 -j MASQUERADE
+  mysql -u root "${MYSQL_AUTH[@]}" -e "DROP USER IF EXISTS '$mysql_user'@'localhost';" 2>/dev/null || true
+  mysql -u root "${MYSQL_AUTH[@]}" -e "DROP DATABASE IF EXISTS \`openvpn-admin\`;"       2>/dev/null || true
+fi
 
-a2dissite openvpn 
-a2ensite 000-default
-systemctl restart apache2
+# --- Remove OpenVPN files -----------------------------------------------------
+echo -e "${Green}Removing OpenVPN files...${NC}"
+rm -rf /etc/openvpn/easy-rsa/
+rm -rf /etc/openvpn/ccd/
+rm -rf /etc/openvpn/scripts/
+rm -f  /etc/openvpn/server.conf
+rm -f  /etc/openvpn/ca.crt
+rm -f  /etc/openvpn/ta.key
+rm -f  /etc/openvpn/server.crt
+rm -f  /etc/openvpn/server.key
+rm -f  /etc/openvpn/dh*.pem
 
-php_version=$(php -v | head -n1 | cut -f2 -d\  | cut -f1,2 -d.)
-sed -i "/added by openvpn-admin/d" /etc/php/$php_version/apache2/php.ini
-echo "The application has been completely removed!"
+# --- Remove web application ---------------------------------------------------
+echo -e "${Green}Removing web application...${NC}"
+rm -rf "$www"
+
+# --- Remove sudoers entry -----------------------------------------------------
+rm -f /etc/sudoers.d/openvpn-admin
+
+# --- Remove log directory -----------------------------------------------------
+rm -rf /var/log/openvpn/
+
+# --- IP forwarding cleanup ----------------------------------------------------
+echo -e "${Green}Disabling IP forwarding...${NC}"
+echo 0 > /proc/sys/net/ipv4/ip_forward
+# Remove sysctl.d entry added by install.sh
+rm -f /etc/sysctl.d/99-openvpn.conf
+# Also clean up any old-style entry in sysctl.conf (added by older versions)
+sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf 2>/dev/null || true
+sysctl -p /etc/sysctl.d/*.conf &>/dev/null || true
+
+# --- iptables cleanup ---------------------------------------------------------
+echo -e "${Green}Removing iptables rules...${NC}"
+iptables -D FORWARD -i tun0 -j ACCEPT 2>/dev/null || true
+iptables -D FORWARD -o tun0 -j ACCEPT 2>/dev/null || true
+iptables -D OUTPUT  -o tun0 -j ACCEPT 2>/dev/null || true
+
+if [ -n "$primary_nic" ]; then
+  iptables -D FORWARD -i tun0 -o "$primary_nic" -j ACCEPT                       2>/dev/null || true
+  iptables -t nat -D POSTROUTING -o "$primary_nic" -j MASQUERADE                2>/dev/null || true
+  iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o "$primary_nic" -j MASQUERADE 2>/dev/null || true
+  iptables -t nat -D POSTROUTING -s 10.8.0.2/24 -o "$primary_nic" -j MASQUERADE 2>/dev/null || true
+else
+  echo -e "${Yellow}Warning: could not detect primary NIC. iptables NAT rules may need manual removal.${NC}"
+fi
+
+# Persist the cleaned-up ruleset (removes our rules, keeps any others)
+if [ -d /etc/iptables ]; then
+  iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+fi
+
+# --- Apache cleanup -----------------------------------------------------------
+echo -e "${Green}Removing Apache configuration...${NC}"
+a2dissite openvpn 2>/dev/null || true
+rm -f /etc/apache2/sites-available/openvpn.conf
+a2ensite 000-default 2>/dev/null || true
+systemctl restart apache2 2>/dev/null || true
+
+# --- PHP timezone cleanup -----------------------------------------------------
+php_version=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+if [ -n "$php_version" ]; then
+  php_ini="/etc/php/$php_version/apache2/php.ini"
+  if [ -f "$php_ini" ]; then
+    # Revert date.timezone back to commented-out default
+    sed -i "s|^date.timezone = .*|;date.timezone =|" "$php_ini" 2>/dev/null || true
+    # Remove old-style line added by earlier versions of this installer
+    sed -i "/added by openvpn-admin/d" "$php_ini" 2>/dev/null || true
+  fi
+fi
+
+# --- Done ---------------------------------------------------------------------
+echo -e ""
+echo -e "${Green}OpenVPN-Admin has been completely removed.${NC}"
+echo -e "${Yellow}Note: packages (openvpn, apache2, mysql/mariadb, php) were not removed."
+echo -e "      Remove them manually if no longer needed.${NC}"
