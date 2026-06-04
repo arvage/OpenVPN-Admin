@@ -39,18 +39,19 @@ esac
 
 echo -e "${Green}Detected OS: ${Red}$OS${NC}"
 
-# --- Suppress needrestart interactive prompts (Ubuntu 22+ only) ---------------
-NEEDRESTART_CONF="/etc/needrestart/needrestart.conf"
-if [ -f "$NEEDRESTART_CONF" ]; then
-  sudo sed -i "s/#\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/g" "$NEEDRESTART_CONF" || true
-fi
+# --- Suppress needrestart and apt interactive prompts -------------------------
+# NEEDRESTART_MODE=a tells needrestart to restart services automatically
+# without any prompts. This works via environment variable alone - no file
+# editing needed, no root permission required at this point.
+export NEEDRESTART_MODE=a
+export DEBIAN_FRONTEND=noninteractive
 
 # --- Update package lists and install git -------------------------------------
 echo -e "${Green}Updating package lists...${NC}"
-DEBIAN_FRONTEND=noninteractive sudo apt-get update -q
+sudo -E apt-get update -q
 
 echo -e "${Green}Installing git...${NC}"
-DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -q git
+sudo -E apt-get install -y -q git
 
 # --- Clone the repository -----------------------------------------------------
 INSTALL_DIR="$HOME/openvpn-admin"
@@ -69,4 +70,4 @@ chmod +x ./install.sh
 
 # --- Run installer ------------------------------------------------------------
 echo -e "${Green}Starting installation...${NC}"
-sudo ./install.sh /var/www www-data www-data
+sudo -E ./install.sh /var/www www-data www-data

@@ -115,6 +115,7 @@ sleep 1
 echo -e "${Green}Installing Prerequisites...${NC}"
 
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 
 case $OS in
   Ubuntu)
