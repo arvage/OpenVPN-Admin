@@ -23,9 +23,12 @@
   }
 
   function isInstalled($bdd) {
-    $req = $bdd->prepare("SHOW TABLES LIKE 'admin'");
-    $req->execute();
-    return (bool)$req->fetch();
+    try {
+      $req = $bdd->query("SELECT COUNT(*) FROM admin");
+      return (int)$req->fetchColumn() > 0;
+    } catch (Exception $e) {
+      return false;
+    }
   }
 
   function hashPass($pass) {
