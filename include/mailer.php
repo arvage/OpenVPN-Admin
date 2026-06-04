@@ -20,8 +20,8 @@ class SmtpMailer {
     }
     if (!$conn) return false;
 
-    $r = fn() => fgets($conn, 515);
-    $w = fn($cmd) => fputs($conn, $cmd . "\r\n");
+    $r = function() use (&$conn) { return fgets($conn, 515); };
+    $w = function($cmd) use (&$conn) { return fputs($conn, $cmd . "\r\n"); };
 
     $r(); // server greeting
     $w("EHLO " . (gethostname() ?: 'localhost'));

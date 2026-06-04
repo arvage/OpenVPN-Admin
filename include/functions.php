@@ -85,7 +85,7 @@
       if (preg_match('/^ROUTING TABLE|^GLOBAL STATS|^OpenVPN STATISTICS/', $line)) { $in_clients = false; continue; }
       if (!$in_clients) continue;
 
-      $parts = str_contains($line, "\t") ? explode("\t", $line) : explode(",", $line);
+      $parts = (strpos($line, "\t") !== false) ? explode("\t", $line) : explode(",", $line);
       if (count($parts) < 4) continue;
 
       $rx = intval($parts[2] ?? 0);
@@ -127,7 +127,7 @@
       $cert_path = "/etc/openvpn/easy-rsa/pki/issued/$cn.crt";
       $certs[] = [
         'status'      => $status,
-        'status_label'=> match($status) { 'V' => 'Valid', 'R' => 'Revoked', 'E' => 'Expired', default => $status },
+        'status_label'=> isset(['V'=>'Valid','R'=>'Revoked','E'=>'Expired'][$status]) ? ['V'=>'Valid','R'=>'Revoked','E'=>'Expired'][$status] : $status,
         'cn'          => $cn,
         'has_cert'    => file_exists($cert_path),
       ];
