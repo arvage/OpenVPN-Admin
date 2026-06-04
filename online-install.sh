@@ -1,47 +1,72 @@
 #!/bin/bash
-NC='\033[0m'            # No Color
-Red='\033[1;31m'        # Light Red
-Yellow='\033[0;33m'     # Yellow
-Green='\033[0;32m'      # Green
+set -e
+
+# --- Colors -------------------------------------------------------------------
+NC='\033[0m'
+Red='\033[1;31m'
+Yellow='\033[0;33m'
+Green='\033[0;32m'
+
 clear
-echo '.-----------------------------------------------------------------------------.'
-echo '||Es| |F1 |F2 |F3 |F4 |F5 | |F6 |F7 |F8 |F9 |F10|                  C= AMIGA   |'
-echo '||__| |___|___|___|___|___| |___|___|___|___|___|                             |'
-echo '| _____________________________________________     ________    ___________   |'
-echo '||~  |! |" |� |$ |% |& |/ |( |) |= |? |` || |<-|   |Del|Help|  |{ |} |/ |* |  |'
-echo '||`__|1_|2_|3_|4_|5_|6_|7_|8_|9_|0_|�_|�_|\_|__|   |___|____|  |[ |]_|__|__|  |'
-echo '||<-  |Q |W |E |R |T |Z |U |I |O |P |� |* |   ||               |7 |8 |9 |- |  |'
-echo '||->__|__|__|__|__|__|__|__|__|__|__|__|+_|_  ||               |__|__|__|__|  |'
-echo "||Ctr|oC|A |S |D |F |G |H |J |K |L |� |� |^ |<'|               |4 |5 |6 |+ |  |"
-echo '||___|_L|__|__|__|__|__|__|__|__|__|__|__|#_|__|       __      |__|__|__|__|  |'
-echo '||^    |> |Y |X |C |V |B |N |M |; |: |_ |^     |      |A |     |1 |2 |3 |E |  |'
-echo '||_____|<_|__|__|__|__|__|__|__|,_|._|-_|______|    __||_|__   |__|__|__|n |  |'
-echo '|   |Alt|A  |                       |A  |Alt|      |<-|| |->|  |0    |. |t |  |'
-echo '|   |___|___|_______________________|___|___|      |__|V_|__|  |_____|__|e_|  |'
-echo '|                                                                             |'
-echo '`-----------------------------------------------------------------------------.'
-echo
-echo
 
-
-. /etc/os-release
-OS=$(echo "$ID" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')  # e.g. debian -> Debian
-if [ "$OS" == "Ubuntu" ] || [ "$OS" == "Raspbian" ] || [ "$OS" == "Debian" ];
-then
-  :
-else
-  echo -e "${Red}Oops! Only Ubuntu, Raspbian and Debian OS are supported.${NC}"
-  exit
-fi
-sudo sed -i 's/#$nrconf{restart} = '"'"'i'"'"';/$nrconf{restart} = '"'"'a'"'"';/g' /etc/needrestart/needrestart.conf
-echo
-echo -e "${Green}Updating and Getting Ready${Yellow}"
-DEBIAN_FRONTEND=noninteractive sudo apt-get update && sudo apt-get upgrade -y -q
-DEBIAN_FRONTEND=noninteractive sudo apt-get install -y git mc
-cd ~
-echo -e "${Red}"
-git clone https://github.com/arvage/OpenVPN-Admin openvpn-admin
+echo -e "${Green}"
+echo '  ================================================'
+echo '  |                                              |'
+echo '  |         OpenVPN-Admin Online Installer       |'
+echo '  |      github.com/arvage/OpenVPN-Admin         |'
+echo '  |                                              |'
+echo '  ================================================'
 echo -e "${NC}"
-cd openvpn-admin
+
+# --- OS Detection -------------------------------------------------------------
+. /etc/os-release
+OS=$(echo "$ID" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
+
+# 64-bit Raspberry Pi OS identifies as "debian" - detect by hardware
+IS_RASPBERRYPI=false
+if grep -qiE "Raspberry Pi|BCM2" /proc/cpuinfo 2>/dev/null; then
+  IS_RASPBERRYPI=true
+  OS="Raspbian"
+fi
+
+case "$OS" in
+  Ubuntu|Raspbian|Debian) ;;
+  *)
+    echo -e "${Red}Only Ubuntu, Debian, and Raspberry Pi OS are supported.${NC}"
+    exit 1
+    ;;
+esac
+
+echo -e "${Green}Detected OS: ${Red}$OS${NC}"
+
+# --- Suppress needrestart interactive prompts (Ubuntu 22+ only) ---------------
+NEEDRESTART_CONF="/etc/needrestart/needrestart.conf"
+if [ -f "$NEEDRESTART_CONF" ]; then
+  sed -i "s/#\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/g" "$NEEDRESTART_CONF" || true
+fi
+
+# --- Update package lists and install git -------------------------------------
+echo -e "${Green}Updating package lists...${NC}"
+DEBIAN_FRONTEND=noninteractive sudo apt-get update -q
+
+echo -e "${Green}Installing git...${NC}"
+DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -q git
+
+# --- Clone the repository -----------------------------------------------------
+INSTALL_DIR="$HOME/openvpn-admin"
+
+if [ -d "$INSTALL_DIR" ]; then
+  echo -e "${Yellow}Directory $INSTALL_DIR already exists. Pulling latest changes...${NC}"
+  git -C "$INSTALL_DIR" pull origin master
+else
+  echo -e "${Green}Cloning OpenVPN-Admin...${NC}"
+  git clone https://github.com/arvage/OpenVPN-Admin "$INSTALL_DIR"
+fi
+
+cd "$INSTALL_DIR" || { echo -e "${Red}Failed to enter $INSTALL_DIR${NC}"; exit 1; }
+
 chmod +x ./install.sh
+
+# --- Run installer ------------------------------------------------------------
+echo -e "${Green}Starting installation...${NC}"
 sudo ./install.sh /var/www www-data www-data
