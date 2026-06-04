@@ -135,6 +135,25 @@
     return $certs;
   }
 
+  // Execute a SQL migration file statement-by-statement.
+  // Silently skips "duplicate column" (1060) and "table already exists" (1050)
+  // so migrations are safe to re-run and work on both MySQL and MariaDB.
+  function execMigrationSql($bdd, $sql) {
+    $statements = array_filter(array_map('trim', explode(';', $sql)));
+    foreach ($statements as $stmt) {
+      if ($stmt === '') continue;
+      try {
+        $bdd->exec($stmt);
+      } catch (PDOException $e) {
+        $errno = isset($e->errorInfo[1]) ? (int)$e->errorInfo[1] : 0;
+        // 1060 = Duplicate column name, 1050 = Table already exists
+        if (!in_array($errno, [1060, 1050])) {
+          throw $e;
+        }
+      }
+    }
+  }
+
   function getSmtpSettings($bdd): array {
     try {
       $req = $bdd->query('SELECT * FROM smtp_settings WHERE id = 1');

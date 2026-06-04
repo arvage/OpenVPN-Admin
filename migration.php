@@ -34,11 +34,10 @@
     // Do the migration, we are behind the last schema
     if ($sql_schema < $migration_value) {
 
-      // Create the tables or die
+      // Apply the migration, statement by statement
       $sql_file = dirname(__FILE__) . "/sql/schema-$migration_value.sql";
       try {
-        $sql = file_get_contents($sql_file);
-        $bdd->exec($sql);
+        execMigrationSql($bdd, file_get_contents($sql_file));
       }
       catch (PDOException $e) {
         printError($e->getMessage());

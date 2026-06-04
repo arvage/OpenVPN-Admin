@@ -143,7 +143,7 @@
         $sql_file = dirname(__FILE__) . "/sql/schema-$mv.sql";
         if (!file_exists($sql_file)) continue;
         try {
-          $bdd->exec(file_get_contents($sql_file));
+          execMigrationSql($bdd, file_get_contents($sql_file));
         } catch (PDOException $e) {
           printError($e->getMessage()); exit(1);
         }

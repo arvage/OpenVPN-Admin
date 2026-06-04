@@ -1,9 +1,9 @@
 -- Migration 10: admin roles, SMTP/notification settings
 -- Add missing columns to admin table (not in schema-0)
-ALTER TABLE `admin` ADD COLUMN IF NOT EXISTS `admin_mail` varchar(64) DEFAULT NULL;
-ALTER TABLE `admin` ADD COLUMN IF NOT EXISTS `admin_phone` varchar(16) DEFAULT NULL;
-ALTER TABLE `admin` ADD COLUMN IF NOT EXISTS `admin_enable` tinyint(1) NOT NULL DEFAULT 1;
-ALTER TABLE `admin` ADD COLUMN IF NOT EXISTS `admin_role` enum('super-admin','read-only') NOT NULL DEFAULT 'super-admin';
+ALTER TABLE `admin` ADD COLUMN `admin_mail` varchar(64) DEFAULT NULL;
+ALTER TABLE `admin` ADD COLUMN `admin_phone` varchar(16) DEFAULT NULL;
+ALTER TABLE `admin` ADD COLUMN `admin_enable` tinyint(1) NOT NULL DEFAULT 1;
+ALTER TABLE `admin` ADD COLUMN `admin_role` enum('super-admin','read-only') NOT NULL DEFAULT 'super-admin';
 
 -- SMTP configuration and notification toggles
 CREATE TABLE IF NOT EXISTS `smtp_settings` (
