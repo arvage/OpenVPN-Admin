@@ -22,5 +22,11 @@
         </form>
       </div>
     </div>
+    <p class="text-center mt-3 mb-0" style="font-size:0.78em; color:#999;">
+      <i class="bi bi-github me-1"></i>
+      <a href="https://github.com/arvage/OpenVPN-Admin" target="_blank" rel="noopener" style="color:#999;">
+        by Armin &mdash; github.com/arvage/OpenVPN-Admin
+      </a>
+    </p>
   </div>
 </div>

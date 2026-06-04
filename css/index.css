@@ -119,6 +119,24 @@ html, body { height: 100%; }
   border-top: 1px solid #2a2a4a;
 }
 
+.sidebar-credit {
+  padding: 8px 16px 10px;
+  background: #12122a;
+  font-size: 0.75em;
+  text-align: center;
+  border-top: 1px solid #1e1e38;
+}
+
+.sidebar-credit a {
+  color: #45475a;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.sidebar-credit a:hover {
+  color: #89b4fa;
+}
+
 /* ===== MAIN CONTENT ===== */
 
 .main-content {

@@ -244,6 +244,12 @@
           <span class="badge bg-secondary" title="Read Only">RO</span>
         <?php endif; ?>
       </div>
+      <div class="sidebar-credit">
+        <i class="bi bi-github"></i>
+        <a href="https://github.com/arvage/OpenVPN-Admin" target="_blank" rel="noopener">
+          by Armin
+        </a>
+      </div>
     </div>
   </aside>
 
