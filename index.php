@@ -124,7 +124,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/bootstrap-table.min.css"/>
-  <link rel="stylesheet" href="css/index.css"/>
+  <link rel="stylesheet" href="css/index.css?v=<?= filemtime(__DIR__.'/css/index.css') ?>"/>
   <link rel="icon" type="image/png" href="css/icon.png"/>
 </head>
 <body class="<?php
@@ -323,12 +323,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/bootstrap-table.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/extensions/filter-control/bootstrap-table-filter-control.min.js"></script>
-<script>
-  window.ADMIN_ROLE   = <?= json_encode($adminRole) ?>;
-  window.CURRENT_PAGE = <?= json_encode($page) ?>;
-  window.CSRF_TOKEN   = <?= json_encode(generateCsrfToken()) ?>;
-</script>
-<script src="js/grids.js"></script>
+<script src="js/config.php?page=<?= urlencode($page) ?>"></script>
+<script src="js/grids.js?v=<?= filemtime(__DIR__.'/js/grids.js') ?>"></script>
 
 </body>
 </html>
