@@ -531,10 +531,14 @@ $(function () {
       $('#smtp_from').val(d.smtp_from || '');
       $('#smtp_from_name').val(d.smtp_from_name || 'OpenVPN Admin');
       $('#smtp_secure').val(d.smtp_secure || 'tls');
-      // notifications
+      // email notifications
       $('#notify_connect').prop('checked',    !!parseInt(d.notify_connect));
       $('#notify_disconnect').prop('checked', !!parseInt(d.notify_disconnect));
       $('#notify_expiry').prop('checked',     !!parseInt(d.notify_expiry));
+      // admin in-app notifications (default add+delete on, edit off)
+      $('#notify_admin_user_add').prop('checked',    d.notify_admin_user_add    !== undefined ? !!parseInt(d.notify_admin_user_add)    : true);
+      $('#notify_admin_user_edit').prop('checked',   d.notify_admin_user_edit   !== undefined ? !!parseInt(d.notify_admin_user_edit)   : false);
+      $('#notify_admin_user_delete').prop('checked', d.notify_admin_user_delete !== undefined ? !!parseInt(d.notify_admin_user_delete) : true);
     });
   }
 
@@ -565,10 +569,13 @@ $(function () {
     e.preventDefault();
     var $btn = $('#notif-save-btn').prop('disabled', true);
     $.post(gridsUrl, {
-      save_smtp:         1,
-      notify_connect:    $('#notify_connect').is(':checked') ? 1 : 0,
-      notify_disconnect: $('#notify_disconnect').is(':checked') ? 1 : 0,
-      notify_expiry:     $('#notify_expiry').is(':checked') ? 1 : 0,
+      save_smtp:                 1,
+      notify_connect:            $('#notify_connect').is(':checked') ? 1 : 0,
+      notify_disconnect:         $('#notify_disconnect').is(':checked') ? 1 : 0,
+      notify_expiry:             $('#notify_expiry').is(':checked') ? 1 : 0,
+      notify_admin_user_add:     $('#notify_admin_user_add').is(':checked') ? 1 : 0,
+      notify_admin_user_edit:    $('#notify_admin_user_edit').is(':checked') ? 1 : 0,
+      notify_admin_user_delete:  $('#notify_admin_user_delete').is(':checked') ? 1 : 0,
     }, function() {
       toast('Notification settings saved.', 'success');
     }, 'json').fail(onError).always(function() { $btn.prop('disabled', false); });

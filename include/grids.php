@@ -27,6 +27,21 @@
   // ──────────────────── HELPER ────────────────────
 
   function createNotification($bdd, $type, $user_id, $detail) {
+    // Check whether this notification type is enabled in settings
+    $col_map = [
+      'add_user'  => 'notify_admin_user_add',
+      'edit_user' => 'notify_admin_user_edit',
+      'del_user'  => 'notify_admin_user_delete',
+    ];
+    $col = $col_map[$type] ?? null;
+    if ($col) {
+      try {
+        $s = $bdd->query("SELECT `$col` FROM smtp_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+        if ($s && isset($s[$col]) && !intval($s[$col])) return;
+      } catch (Exception $e) {
+        // Column may not exist yet (migration pending) — allow notification through
+      }
+    }
     try {
       $bdd->prepare('INSERT INTO notification (notification_type, notification_user_id, notification_detail) VALUES (?, ?, ?)')
           ->execute([$type, $user_id, $detail]);
@@ -376,12 +391,15 @@
     $from        = trim($_POST['smtp_from'] ?? '');
     $from_name   = trim($_POST['smtp_from_name'] ?? 'OpenVPN Admin');
     $secure      = in_array($_POST['smtp_secure'] ?? '', ['tls','ssl','none']) ? $_POST['smtp_secure'] : 'tls';
-    $n_connect   = intval($_POST['notify_connect'] ?? 0);
-    $n_disconnect= intval($_POST['notify_disconnect'] ?? 0);
-    $n_expiry    = intval($_POST['notify_expiry'] ?? 0);
+    $n_connect        = intval($_POST['notify_connect']          ?? 0);
+    $n_disconnect     = intval($_POST['notify_disconnect']       ?? 0);
+    $n_expiry         = intval($_POST['notify_expiry']           ?? 0);
+    $n_admin_add      = intval($_POST['notify_admin_user_add']   ?? 1);
+    $n_admin_edit     = intval($_POST['notify_admin_user_edit']  ?? 0);
+    $n_admin_delete   = intval($_POST['notify_admin_user_delete']?? 1);
 
-    $fields = 'smtp_host=?, smtp_port=?, smtp_user=?, smtp_from=?, smtp_from_name=?, smtp_secure=?, notify_connect=?, notify_disconnect=?, notify_expiry=?';
-    $vals   = [$host, $port, $smtp_user, $from, $from_name, $secure, $n_connect, $n_disconnect, $n_expiry];
+    $fields = 'smtp_host=?, smtp_port=?, smtp_user=?, smtp_from=?, smtp_from_name=?, smtp_secure=?, notify_connect=?, notify_disconnect=?, notify_expiry=?, notify_admin_user_add=?, notify_admin_user_edit=?, notify_admin_user_delete=?';
+    $vals   = [$host, $port, $smtp_user, $from, $from_name, $secure, $n_connect, $n_disconnect, $n_expiry, $n_admin_add, $n_admin_edit, $n_admin_delete];
 
     // Only update password if a new one was provided
     if (!empty($_POST['smtp_pass'])) {

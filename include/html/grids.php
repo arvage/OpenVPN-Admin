@@ -306,6 +306,33 @@ function getHistory($cfg_file, $accordion_id, $open_first = false) {
               <span class="text-muted small">Email user 7 days before their account expires</span>
             </label>
           </div>
+
+          <hr/>
+          <p class="small fw-semibold mb-1"><i class="bi bi-bell me-1"></i>Admin Notifications (in-app bell)</p>
+          <p class="text-muted small mb-3">Control which user events create notifications for super-admins.</p>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="notify_admin_user_add" name="notify_admin_user_add" <?= $adminRole!=='super-admin'?'disabled':'' ?>>
+            <label class="form-check-label" for="notify_admin_user_add">
+              <strong>User Added</strong><br>
+              <span class="text-muted small">Notify super-admins when a new user is created</span>
+            </label>
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="notify_admin_user_edit" name="notify_admin_user_edit" <?= $adminRole!=='super-admin'?'disabled':'' ?>>
+            <label class="form-check-label" for="notify_admin_user_edit">
+              <strong>User Edited</strong><br>
+              <span class="text-muted small">Notify super-admins when a user's details are changed</span>
+            </label>
+          </div>
+          <div class="form-check form-switch mb-4">
+            <input class="form-check-input" type="checkbox" id="notify_admin_user_delete" name="notify_admin_user_delete" <?= $adminRole!=='super-admin'?'disabled':'' ?>>
+            <label class="form-check-label" for="notify_admin_user_delete">
+              <strong>User Deleted</strong><br>
+              <span class="text-muted small">Notify super-admins when a user is removed</span>
+            </label>
+          </div>
+
           <?php if($adminRole === 'super-admin'): ?>
           <button type="submit" class="btn btn-primary" id="notif-save-btn">
             <i class="bi bi-floppy me-1"></i>Save Notification Settings
