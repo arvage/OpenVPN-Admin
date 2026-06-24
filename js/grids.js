@@ -555,6 +555,93 @@ $(function () {
   });
 
 
+  // ════════════════════ NOTIFICATIONS ════════════════════
+
+  function refreshNotifications() {
+    $.getJSON(gridsUrl, { select: 'notifications' }, function(data) {
+      if (!data.is_super) return;
+
+      if (data.count > 0) {
+        $('#notification-count').text(data.count).show();
+      } else {
+        $('#notification-count').hide();
+      }
+
+      var $list = $('#notification-list');
+      $list.find('li.notification-item').remove();
+
+      if (!data.notifications || data.notifications.length === 0) {
+        $list.append('<li class="notification-item px-3 py-2 text-muted small">No notifications yet.</li>');
+      } else {
+        $.each(data.notifications, function(i, n) {
+          var icon, iconClass;
+          if (n.notification_type === 'add_user') {
+            icon = 'person-plus'; iconClass = 'text-success';
+          } else if (n.notification_type === 'del_user') {
+            icon = 'person-x'; iconClass = 'text-danger';
+          } else {
+            icon = 'pencil'; iconClass = 'text-primary';
+          }
+          var cls = n.is_read ? '' : 'notif-unread';
+          $list.append(
+            '<li class="notification-item px-3 py-2 border-bottom ' + cls + '">' +
+            '<div class="d-flex align-items-start gap-2">' +
+            '<i class="bi bi-' + icon + ' ' + iconClass + ' mt-1 flex-shrink-0"></i>' +
+            '<div><div class="small">' + $('<span>').text(n.notification_detail).html() + '</div>' +
+            '<div class="text-muted" style="font-size:0.75em">' + n.notification_created_at + '</div>' +
+            '</div></div></li>'
+          );
+        });
+      }
+    });
+  }
+
+  $('#notification-bell').on('click', function() {
+    if ($('#notification-count').is(':visible')) {
+      $.post(gridsUrl, { mark_notifications_read: 1 }, function() {
+        $('#notification-count').hide();
+        $('.notif-unread').removeClass('notif-unread');
+      });
+    }
+  });
+
+  $('#mark-all-read').on('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $.post(gridsUrl, { mark_notifications_read: 1 }, function() {
+      $('#notification-count').hide();
+      $('.notif-unread').removeClass('notif-unread');
+      toast('All notifications marked as read.', 'success');
+    });
+  });
+
+  if ($('#notif-wrapper').length) {
+    refreshNotifications();
+    setInterval(refreshNotifications, 30000);
+  }
+
+
+  // ════════════════════ PROFILE ════════════════════
+
+  $(document).on('show.bs.modal', '#modal-profile-edit', function() {
+    $.getJSON(gridsUrl, { select: 'my_profile' }, function(d) {
+      $('#profile-mail').val(d.admin_mail || '');
+    });
+  });
+
+  $('#profile-save').on('click', function() {
+    var mail = $('#profile-mail').val().trim();
+    $.post(gridsUrl, { set_admin_profile: 1, admin_mail: mail }, function(r) {
+      if (r.ok) {
+        bootstrap.Modal.getInstance('#modal-profile-edit').hide();
+        toast('Profile updated.', 'success');
+      } else {
+        toast('Failed to update profile.', 'danger');
+      }
+    }, 'json').fail(onError);
+  });
+
+
   // ════════════════════ AUTOFOCUS IN MODALS ════════════════════
 
   $(document).on('shown.bs.modal', '.modal', function() {

@@ -263,7 +263,25 @@
         </button>
         <span class="topbar-title"><?= htmlspecialchars($topbar_title) ?></span>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 align-items-center">
+        <?php if ($adminRole === 'super-admin'): ?>
+        <div class="dropdown" id="notif-wrapper">
+          <button class="btn btn-sm btn-outline-secondary position-relative" id="notification-bell" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge bg-danger position-absolute top-0 start-100 translate-middle" id="notification-count" style="display:none;font-size:0.65em">0</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow" id="notification-list" style="min-width:320px;max-height:420px;overflow-y:auto">
+            <li class="px-3 py-2 d-flex justify-content-between align-items-center border-bottom">
+              <strong class="small">Notifications</strong>
+              <a href="#" id="mark-all-read" class="small text-muted text-decoration-none">Mark all read</a>
+            </li>
+            <li class="notification-item px-3 py-2 text-muted small">Loading…</li>
+          </ul>
+        </div>
+        <?php endif; ?>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-profile-edit" title="Edit Profile">
+          <i class="bi bi-person-circle me-1"></i>Profile
+        </button>
         <a href="index.php?admin_configuration_get" class="btn btn-sm btn-outline-secondary">
           <i class="bi bi-download me-1"></i>Shared Config
         </a>

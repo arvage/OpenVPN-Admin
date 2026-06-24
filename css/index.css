@@ -360,3 +360,11 @@ tr.user-expired td:first-child {
     flex: 1 1 calc(50% - 14px);
   }
 }
+
+/* Notification unread highlight */
+.notif-unread {
+  background-color: #eef5ff;
+}
+.notif-unread .small {
+  font-weight: 600;
+}

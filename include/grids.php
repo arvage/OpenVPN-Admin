@@ -11,6 +11,15 @@
 
   $role = getCurrentAdminRole($bdd);
 
+  // ──────────────────── HELPER ────────────────────
+
+  function createNotification($bdd, $type, $user_id, $detail) {
+    try {
+      $bdd->prepare('INSERT INTO notification (notification_type, notification_user_id, notification_detail) VALUES (?, ?, ?)')
+          ->execute([$type, $user_id, $detail]);
+    } catch (Exception $e) {}
+  }
+
   // ──────────────────── SELECT / READ ────────────────────
 
   if (isset($_GET['select'])) {
@@ -119,6 +128,33 @@
       echo json_encode($s);
     }
 
+    else if ($sel === 'notifications') {
+      if ($role !== 'super-admin') {
+        echo json_encode(['is_super' => false, 'count' => 0, 'notifications' => []]);
+        exit;
+      }
+      try {
+        $req = $bdd->prepare('SELECT * FROM notification ORDER BY notification_created_at DESC LIMIT 50');
+        $req->execute();
+        $rows = $req->fetchAll(PDO::FETCH_ASSOC);
+        $unread = 0;
+        foreach ($rows as &$n) {
+          $read_by = json_decode($n['notification_read_by'] ?: '[]', true);
+          $n['is_read'] = in_array($_SESSION['admin_id'], $read_by);
+          if (!$n['is_read']) $unread++;
+        }
+        echo json_encode(['is_super' => true, 'count' => $unread, 'notifications' => $rows]);
+      } catch (Exception $e) {
+        echo json_encode(['is_super' => false, 'count' => 0, 'notifications' => []]);
+      }
+    }
+
+    else if ($sel === 'my_profile') {
+      $req = $bdd->prepare('SELECT admin_id, admin_mail FROM admin WHERE admin_id = ?');
+      $req->execute([$_SESSION['admin_id']]);
+      echo json_encode($req->fetch(PDO::FETCH_ASSOC) ?: []);
+    }
+
     exit;
   }
 
@@ -139,6 +175,7 @@
        VALUES (?, ?, ?, ?, 0, 1, ?, ?)'
     );
     $req->execute([$id, $pass, $mail, $phone, $start, $end]);
+    createNotification($bdd, 'add_user', $id, 'User "' . $id . '" added by ' . $_SESSION['admin_id']);
     echo json_encode(['user_id' => $id, 'user_mail' => $mail, 'user_phone' => $phone,
                       'user_online' => 0, 'user_enable' => 1, 'user_start_date' => $start, 'user_end_date' => $end]);
   }
@@ -161,14 +198,17 @@
 
     $req = $bdd->prepare("UPDATE user SET $field = ? WHERE user_id = ?");
     $req->execute([$value, $pk]);
+    createNotification($bdd, 'edit_user', $pk, 'User "' . $pk . '" field "' . $field . '" updated by ' . $_SESSION['admin_id']);
     echo json_encode(['ok' => true]);
   }
 
   // ---- DELETE USER ----
   else if (isset($_POST['del_user'], $_POST['del_user_id'])) {
     requireSuperAdmin($bdd);
+    $uid = $_POST['del_user_id'];
     $req = $bdd->prepare('DELETE FROM user WHERE user_id = ?');
-    $req->execute([$_POST['del_user_id']]);
+    $req->execute([$uid]);
+    createNotification($bdd, 'del_user', $uid, 'User "' . $uid . '" deleted by ' . $_SESSION['admin_id']);
     echo json_encode(['ok' => true]);
   }
 
@@ -218,6 +258,34 @@
     }
     $req = $bdd->prepare('DELETE FROM admin WHERE admin_id = ?');
     $req->execute([$_POST['del_admin_id']]);
+    echo json_encode(['ok' => true]);
+  }
+
+  // ---- MARK NOTIFICATIONS READ ----
+  else if (isset($_POST['mark_notifications_read'])) {
+    if ($role !== 'super-admin') { http_response_code(403); exit; }
+    try {
+      $admin_id = $_SESSION['admin_id'];
+      $rows = $bdd->query('SELECT notification_id, notification_read_by FROM notification')->fetchAll(PDO::FETCH_ASSOC);
+      foreach ($rows as $n) {
+        $read_by = json_decode($n['notification_read_by'] ?: '[]', true);
+        if (!in_array($admin_id, $read_by)) {
+          $read_by[] = $admin_id;
+          $bdd->prepare('UPDATE notification SET notification_read_by = ? WHERE notification_id = ?')
+              ->execute([json_encode($read_by), $n['notification_id']]);
+        }
+      }
+      echo json_encode(['ok' => true]);
+    } catch (Exception $e) {
+      echo json_encode(['ok' => false]);
+    }
+  }
+
+  // ---- UPDATE OWN PROFILE EMAIL ----
+  else if (isset($_POST['set_admin_profile'])) {
+    $mail = filter_var(trim($_POST['admin_mail'] ?? ''), FILTER_VALIDATE_EMAIL) ?: null;
+    $bdd->prepare('UPDATE admin SET admin_mail = ? WHERE admin_id = ?')
+        ->execute([$mail, $_SESSION['admin_id']]);
     echo json_encode(['ok' => true]);
   }
 

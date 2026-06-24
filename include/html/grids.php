@@ -505,6 +505,30 @@ function getHistory($cfg_file, $accordion_id, $open_first = false) {
   </div>
 </div>
 
+<!-- Profile Edit Modal -->
+<div id="modal-profile-edit" class="modal fade" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-circle me-2"></i>Edit Profile</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="profile-mail" class="form-control" placeholder="your@email.com"/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="profile-save">
+          <i class="bi bi-floppy me-1"></i>Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Send Config Email Modal -->
 <div id="modal-send-config" class="modal fade" tabindex="-1">
   <div class="modal-dialog modal-sm">
