@@ -10,6 +10,7 @@ Green='\033[0;32m'
 print_help() {
   echo -e "sudo ./update.sh www_basedir"
   echo -e "\twww_basedir: The directory where the web application is (e.g. /var/www)"
+  echo -e "\tPulls the latest code from git automatically before applying the update."
 }
 
 # --- Root check ---------------------------------------------------------------
@@ -41,6 +42,24 @@ if [ ! -f "$www/include/config.php" ]; then
 fi
 
 base_path=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+# --- Git pull -----------------------------------------------------------------
+if git -C "$base_path" rev-parse --is-inside-work-tree &>/dev/null; then
+  echo -e "${Green}Pulling latest code from git...${NC}"
+  # Run git pull as the repo owner, not root, to avoid permission issues
+  repo_owner=$(stat -c '%U' "$base_path/.git" 2>/dev/null || echo "")
+  if [ -n "$repo_owner" ] && [ "$repo_owner" != "root" ]; then
+    sudo -u "$repo_owner" git -C "$base_path" pull origin master || {
+      echo -e "${Yellow}Warning: git pull failed. Continuing with local files.${NC}"
+    }
+  else
+    git -C "$base_path" pull origin master || {
+      echo -e "${Yellow}Warning: git pull failed. Continuing with local files.${NC}"
+    }
+  fi
+else
+  echo -e "${Yellow}Not a git repository — skipping git pull.${NC}"
+fi
 
 # Use stat instead of ls -l for reliable user/group detection
 user=$(stat -c '%U' "$www/include/config.php")
