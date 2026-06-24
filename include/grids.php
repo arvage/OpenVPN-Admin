@@ -1,4 +1,12 @@
 <?php
+  $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? 80) == 443);
+  session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'secure'   => $secure,
+    'httponly' => true,
+    'samesite' => 'Strict',
+  ]);
   session_start();
 
   if (!isset($_SESSION['admin_id'])) {
@@ -10,6 +18,11 @@
   require(dirname(__FILE__) . '/functions.php');
 
   $role = getCurrentAdminRole($bdd);
+
+  // CSRF validation for all state-changing POST requests
+  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
+  }
 
   // ──────────────────── HELPER ────────────────────
 
@@ -32,7 +45,6 @@
       while ($data = $req->fetch()) {
         $list[] = [
           'user_id'         => $data['user_id'],
-          'user_pass'       => $data['user_pass'],
           'user_mail'       => $data['user_mail'],
           'user_phone'      => $data['user_phone'],
           'user_online'     => $data['user_online'],
@@ -83,11 +95,10 @@
       while ($data = $req->fetch()) {
         $list[] = [
           'admin_id'     => $data['admin_id'],
-          'admin_pass'   => $data['admin_pass'],
           'admin_mail'   => $data['admin_mail'] ?? '',
           'admin_phone'  => $data['admin_phone'] ?? '',
           'admin_enable' => $data['admin_enable'] ?? 1,
-          'admin_role'   => $data['admin_role'] ?? 'super-admin',
+          'admin_role'   => $data['admin_role'] ?? 'read-only',
         ];
       }
       echo json_encode($list);
@@ -292,19 +303,28 @@
   // ---- UPDATE CONFIG FILE ----
   else if (isset($_POST['update_config'])) {
     requireSuperAdmin($bdd);
-    $pathinfo = pathinfo($_POST['config_file']);
-    $full_uri = $_POST['config_file'];
-    $full_path = $pathinfo['dirname'];
-    $config_name = basename($_POST['config_file']);
+    $allowed_configs = [
+      'client-conf/gnu-linux/client.conf',
+      'client-conf/windows/client.ovpn',
+      'client-conf/osx-viscosity/client.conf',
+      'client-conf/windows/filename',
+    ];
+    $config_file = $_POST['config_file'] ?? '';
+    if (!in_array($config_file, $allowed_configs, true)) {
+      echo json_encode(['config_success' => false]);
+      exit;
+    }
 
-    if (!file_exists("../$full_uri")) { echo json_encode(['config_success' => false]); exit; }
+    $config_name = basename($config_file);
+    $config_dir  = dirname($config_file);
+    $history_dir = "../$config_dir/history";
 
-    if (!file_exists("../$full_path/history"))
-      @mkdir("../$full_path/history", 0777, true);
+    if (!file_exists($history_dir))
+      @mkdir($history_dir, 0755, true);
     $ts = time();
-    @copy("../$full_uri", "../$full_path/history/{$ts}_{$config_name}");
+    @copy("../$config_file", "$history_dir/{$ts}_{$config_name}");
 
-    $ok = file_put_contents('../' . $_POST['config_file'], $_POST['config_content']);
+    $ok = file_put_contents("../$config_file", $_POST['config_content']);
     echo json_encode(['config_success' => $ok !== false]);
   }
 
@@ -374,6 +394,7 @@
 
   // ---- DOWNLOAD USER OVPN ----
   else if (isset($_GET['cert_download'], $_GET['cert_name'])) {
+    requireSuperAdmin($bdd);
     $cn = preg_replace('/[^a-zA-Z0-9._-]/', '', trim($_GET['cert_name']));
     if (empty($cn)) { http_response_code(400); exit; }
 

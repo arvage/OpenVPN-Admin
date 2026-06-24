@@ -35,6 +35,21 @@ $(function () {
     return n + ' B';
   }
 
+  // ─── CSRF: attach token to every POST ───
+  $.ajaxPrefilter(function(options) {
+    if (options.type && options.type.toUpperCase() === 'POST') {
+      var token = window.CSRF_TOKEN || '';
+      if (!token) return;
+      if (typeof options.data === 'string') {
+        options.data += (options.data ? '&' : '') + 'csrf_token=' + encodeURIComponent(token);
+      } else if (options.data && typeof options.data === 'object') {
+        options.data.csrf_token = token;
+      } else {
+        options.data = { csrf_token: token };
+      }
+    }
+  });
+
   // ─── SIDEBAR MOBILE TOGGLE ───
   $('#sidebar-toggle').on('click', function() {
     $('#sidebar').toggleClass('open');
@@ -120,21 +135,25 @@ $(function () {
 
   function passFormatter(val, row) {
     if (!isSuperAdmin) return '<span class="pass-mask">••••••</span>';
-    return '<span class="pass-mask">••••••</span>' +
-      '<button class="btn btn-xs btn-warning btn-sm reset-pass-btn" data-user-id="' + row.user_id + '" style="padding:1px 6px;font-size:0.75em">Reset</button>';
+    return $('<span>')
+      .append('<span class="pass-mask">••••••</span>')
+      .append(
+        $('<button class="btn btn-xs btn-warning btn-sm reset-pass-btn" style="padding:1px 6px;font-size:0.75em">Reset</button>')
+          .attr('data-user-id', row.user_id)
+      ).html();
   }
 
   function userActionsFormatter(val, row) {
-    var html = '';
-    if (isSuperAdmin) {
-      html += '<button class="btn btn-xs btn-sm btn-outline-primary me-1 user-edit-btn" data-id="' + row.user_id + '" '
-            + 'data-mail="' + (row.user_mail||'') + '" data-phone="' + (row.user_phone||'') + '" '
-            + 'data-start="' + (row.user_start_date||'') + '" data-end="' + (row.user_end_date||'') + '" '
-            + 'style="padding:1px 6px;font-size:0.75em" title="Edit"><i class="bi bi-pencil"></i></button>';
-      html += '<button class="btn btn-xs btn-sm btn-outline-danger user-del-btn" data-id="' + row.user_id + '" '
-            + 'style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>';
-    }
-    return html || '<span class="text-muted small">–</span>';
+    if (!isSuperAdmin) return '<span class="text-muted small">–</span>';
+    var $wrap = $('<span>');
+    $('<button class="btn btn-xs btn-sm btn-outline-primary me-1 user-edit-btn" style="padding:1px 6px;font-size:0.75em" title="Edit"><i class="bi bi-pencil"></i></button>')
+      .attr({ 'data-id': row.user_id, 'data-mail': row.user_mail || '', 'data-phone': row.user_phone || '',
+              'data-start': row.user_start_date || '', 'data-end': row.user_end_date || '' })
+      .appendTo($wrap);
+    $('<button class="btn btn-xs btn-sm btn-outline-danger user-del-btn" style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>')
+      .attr('data-id', row.user_id)
+      .appendTo($wrap);
+    return $wrap.html();
   }
 
   function userRowStyle(row) {
@@ -152,7 +171,7 @@ $(function () {
     queryParams: function(p) { p.select = 'user'; return p; },
     columns: [
       { title: 'Username',   field: 'user_id' },
-      { title: 'Password',   field: 'user_pass',       formatter: passFormatter },
+      { title: 'Password',   field: 'user_id',          formatter: passFormatter },
       { title: 'Email',      field: 'user_mail' },
       { title: 'Phone',      field: 'user_phone' },
       { title: 'Online',     field: 'user_online',     formatter: onlineFormatter, align: 'center' },
@@ -278,22 +297,27 @@ $(function () {
   var $modalAdminAdd = new bootstrap.Modal('#modal-admin-add');
 
   function adminActionsFormatter(val, row) {
-    var html = '';
-    if (isSuperAdmin && row.admin_id !== (window._currentAdmin || '')) {
-      html += '<button class="btn btn-sm btn-outline-secondary me-1 admin-role-btn" '
-            + 'data-id="' + row.admin_id + '" data-role="' + row.admin_role + '" '
-            + 'style="padding:1px 6px;font-size:0.75em" title="Toggle Role">'
-            + '<i class="bi bi-arrow-repeat"></i></button>';
-      html += '<button class="btn btn-sm btn-outline-danger admin-del-btn" data-id="' + row.admin_id + '" '
-            + 'style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>';
+    if (!isSuperAdmin || row.admin_id === (window._currentAdmin || '')) {
+      return '<span class="text-muted small">–</span>';
     }
-    return html || '<span class="text-muted small">–</span>';
+    var $wrap = $('<span>');
+    $('<button class="btn btn-sm btn-outline-secondary me-1 admin-role-btn" style="padding:1px 6px;font-size:0.75em" title="Toggle Role"><i class="bi bi-arrow-repeat"></i></button>')
+      .attr({ 'data-id': row.admin_id, 'data-role': row.admin_role })
+      .appendTo($wrap);
+    $('<button class="btn btn-sm btn-outline-danger admin-del-btn" style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>')
+      .attr('data-id', row.admin_id)
+      .appendTo($wrap);
+    return $wrap.html();
   }
 
   function adminPassFormatter(val, row) {
     if (!isSuperAdmin) return '<span class="pass-mask">••••••</span>';
-    return '<span class="pass-mask">••••••</span>' +
-      '<button class="btn btn-sm btn-warning reset-pass-btn" data-admin-id="' + row.admin_id + '" style="padding:1px 6px;font-size:0.75em">Reset</button>';
+    return $('<span>')
+      .append('<span class="pass-mask">••••••</span>')
+      .append(
+        $('<button class="btn btn-sm btn-warning reset-pass-btn" style="padding:1px 6px;font-size:0.75em">Reset</button>')
+          .attr('data-admin-id', row.admin_id)
+      ).html();
   }
 
   function roleFormatter(val) {
@@ -307,7 +331,7 @@ $(function () {
     queryParams: function(p) { p.select = 'admin'; return p; },
     columns: [
       { title: 'Username', field: 'admin_id' },
-      { title: 'Password', field: 'admin_pass',   formatter: adminPassFormatter },
+      { title: 'Password', field: 'admin_id',     formatter: adminPassFormatter },
       { title: 'Email',    field: 'admin_mail' },
       { title: 'Role',     field: 'admin_role',   formatter: roleFormatter, align: 'center' },
       { title: '',         field: 'actions',       formatter: adminActionsFormatter, align: 'right' },
@@ -410,21 +434,25 @@ $(function () {
       }
       data.forEach(function(c) {
         var badgeClass = c.status === 'V' ? 'badge-cert-v' : (c.status === 'R' ? 'badge-cert-r' : 'badge-cert-e');
-        var actions = '';
+        var $actions = $('<span>');
         if (c.status === 'V' && c.has_cert) {
-          actions += '<a href="include/grids.php?cert_download=1&cert_name=' + encodeURIComponent(c.cn) + '" class="btn btn-xs btn-sm btn-outline-primary me-1" style="padding:1px 6px;font-size:0.75em" title="Download .ovpn"><i class="bi bi-download"></i></a>';
-          actions += '<button class="btn btn-xs btn-sm btn-outline-secondary me-1 send-cfg-btn" data-cn="' + c.cn + '" style="padding:1px 6px;font-size:0.75em" title="Email config"><i class="bi bi-envelope"></i></button>';
+          $('<a class="btn btn-xs btn-sm btn-outline-primary me-1" style="padding:1px 6px;font-size:0.75em" title="Download .ovpn"><i class="bi bi-download"></i></a>')
+            .attr('href', 'include/grids.php?cert_download=1&cert_name=' + encodeURIComponent(c.cn))
+            .appendTo($actions);
+          $('<button class="btn btn-xs btn-sm btn-outline-secondary me-1 send-cfg-btn" style="padding:1px 6px;font-size:0.75em" title="Email config"><i class="bi bi-envelope"></i></button>')
+            .attr('data-cn', c.cn)
+            .appendTo($actions);
         }
         if (isSuperAdmin && c.status === 'V') {
-          actions += '<button class="btn btn-xs btn-sm btn-outline-danger cert-revoke-btn" data-cn="' + c.cn + '" style="padding:1px 6px;font-size:0.75em" title="Revoke"><i class="bi bi-x-circle"></i></button>';
+          $('<button class="btn btn-xs btn-sm btn-outline-danger cert-revoke-btn" style="padding:1px 6px;font-size:0.75em" title="Revoke"><i class="bi bi-x-circle"></i></button>')
+            .attr('data-cn', c.cn)
+            .appendTo($actions);
         }
-        $tbody.append(
-          '<tr>' +
-          '<td>' + c.cn + '</td>' +
-          '<td><span class="badge ' + badgeClass + '">' + c.status_label + '</span></td>' +
-          '<td class="text-end">' + actions + '</td>' +
-          '</tr>'
-        );
+        var $tr = $('<tr>');
+        $('<td>').text(c.cn).appendTo($tr);
+        $('<td>').html('<span class="badge ' + badgeClass + '">' + c.status_label + '</span>').appendTo($tr);
+        $('<td class="text-end">').append($actions).appendTo($tr);
+        $tbody.append($tr);
       });
     }).fail(function() {
       $('#cert-tbody').html('<tr><td colspan="3" class="text-center text-muted py-4">Could not load certificates.</td></tr>');

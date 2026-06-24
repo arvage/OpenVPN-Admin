@@ -1,4 +1,12 @@
 <?php
+  $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? 80) == 443);
+  session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'secure'   => $secure,
+    'httponly' => true,
+    'samesite' => 'Strict',
+  ]);
   session_start();
 
   require(dirname(__FILE__) . '/include/functions.php');
@@ -310,9 +318,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/bootstrap-table.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.4/dist/extensions/filter-control/bootstrap-table-filter-control.min.js"></script>
 <script>
-  // Expose role and page to JS
-  window.ADMIN_ROLE = <?= json_encode($adminRole) ?>;
+  window.ADMIN_ROLE   = <?= json_encode($adminRole) ?>;
   window.CURRENT_PAGE = <?= json_encode($page) ?>;
+  window.CSRF_TOKEN   = <?= json_encode(generateCsrfToken()) ?>;
 </script>
 <script src="js/grids.js"></script>
 
