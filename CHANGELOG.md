@@ -1,5 +1,39 @@
 # OpenVPN-Admin Version History
 
+## 1.1.0
+
+### New Features
+- **Fail2Ban integration** — new Fail2Ban page in the admin sidebar (super-admin only):
+  - Live jail status cards with currently banned count, currently failing count, and lifetime total
+  - Per-jail banned IP list with one-click unban (confirm dialog)
+  - Manual Ban IP modal: enter any IPv4/IPv6 address and select the target jail
+  - Auto-refreshes every 10 seconds; manual refresh button
+  - `install.sh` and `update.sh` now install fail2ban, write `/etc/fail2ban/filter.d/openvpn.conf` and `/etc/fail2ban/jail.d/openvpn-admin.conf` (SSH + OpenVPN jails, 5 attempts → 1-hour ban), and extend `/etc/sudoers.d/openvpn-admin` to grant the web server passwordless access to `fail2ban-client`
+- **In-app notifications** — bell icon in the topbar for super-admins:
+  - Unread badge count; dropdown shows last 50 events with timestamps
+  - Notification fired on every user add, edit, and delete (records which admin performed the action)
+  - Click bell or "Mark all read" to clear unread state per-admin
+  - Polls every 30 seconds; backed by new `notification` database table (schema-11)
+- **Admin profile editing** — Profile button in the topbar lets any logged-in admin update their own email address; email pre-fills from the database when the modal opens
+- **Dashboard auto-refresh** — user table now also refreshes every 10 seconds while the Users page is open (was manual-only)
+
+### Security Fixes (7 vulnerabilities)
+- **Path traversal → RCE** — `update_config` handler now validates `config_file` against an explicit allowlist of 4 permitted paths; arbitrary file writes via `..` sequences are no longer possible
+- **Password hashes in API responses** — `user_pass` and `admin_pass` are no longer returned by `?select=user` or `?select=admin`; hashes never leave the server
+- **Authorization bypass on certificate download** — `cert_download` handler now calls `requireSuperAdmin()` (was the only sensitive endpoint missing it); read-only admins can no longer download private key material
+- **CSRF** — `generateCsrfToken()` / `verifyCsrfToken()` added; token exposed as `window.CSRF_TOKEN`; jQuery `$.ajaxPrefilter` attaches it to every POST; `grids.php` validates it before any state-changing operation
+- **Stored XSS — certificate CN** — `listCertificates()` now `htmlspecialchars()` the CN field; JS `loadCertificates()` uses `$('<td>').text()` and `.attr()` instead of string concatenation
+- **Stored XSS — user email/phone in HTML attributes** — `userActionsFormatter`, `adminActionsFormatter`, `passFormatter`, and `adminPassFormatter` rebuilt with jQuery DOM construction (`.attr()`, `.append()`); no user data is concatenated into raw HTML strings
+- **Privilege escalation — fail-open role** — `getCurrentAdminRole()` now returns `'read-only'` (not `'super-admin'`) when the role field is empty or on any database exception; system fails closed
+- **Session cookie hardening** — `session_set_cookie_params()` with `httponly=true`, `samesite=Strict`, and `secure` (auto-detected from HTTPS) added before every `session_start()`
+
+### Installer / Updater
+- `install.sh`: fixed `read -t 120` prompt bug — timeout persisted even after user pressed Enter; replaced with plain `read -p` which returns immediately
+- `install.sh` / `update.sh`: fail2ban installed, configured, and enabled as part of the standard install/update flow
+- `update.sh`: sudoers block now always writes both `easyrsa` and `fail2ban-client` entries unconditionally (was "create only if missing"), so existing installs pick up `fail2ban-client` permission on next update
+
+---
+
 ## 1.0.0
 - Upgrade UI from Bootstrap 3 to Bootstrap 5 with Bootstrap Icons (CDN-based; removes Bower/npm dependency entirely)
 - Replace x-editable inline editing with Bootstrap 5 modal-based row editing

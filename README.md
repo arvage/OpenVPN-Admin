@@ -1,6 +1,6 @@
 # OpenVPN Admin
 
-A web-based administration panel for OpenVPN servers — manage users, certificates, logs, and settings through a modern browser interface.
+A web-based administration panel for OpenVPN servers — manage users, certificates, logs, fail2ban bans, and settings through a modern browser interface.
 
 ---
 
@@ -8,11 +8,14 @@ A web-based administration panel for OpenVPN servers — manage users, certifica
 
 | Feature | Description |
 |---|---|
-| **Live Dashboard** | Real-time table of connected clients with IP, bandwidth, and session duration |
+| **Live Dashboard** | Real-time table of connected clients with IP, bandwidth, and session duration. Refreshes every 10 seconds. |
 | **User Management** | Add, edit, enable/disable, and delete VPN users with expiry dates |
 | **Certificate Management** | Generate and revoke per-user certificates via EasyRSA; download individual `.ovpn` files |
+| **Fail2Ban Integration** | View all jails and currently banned IPs, unban with one click, and manually ban any IP from the admin panel |
+| **In-app Notifications** | Super-admins receive a bell notification whenever a user is added, edited, or deleted |
 | **Connection Logs** | Aggregated session history with data transferred per user |
 | **Role-based Admin Access** | `super-admin` (full control) and `read-only` roles for web panel admins |
+| **Admin Profile** | Any admin can set their own email address via the Profile button in the topbar |
 | **Email Notifications** | SMTP configuration with optional alerts on user connect, disconnect, or account expiry |
 | **Client Configs** | Edit and version-history GNU/Linux, Windows, and macOS `.ovpn` templates in-browser |
 | **Modern UI** | Bootstrap 5 interface with dark sidebar, stats cards, and responsive layout |
@@ -58,6 +61,14 @@ http://<your-server-ip>/index.php?installation
 
 Create your first admin account there. The page will redirect to the admin panel when done.
 
+The installer automatically sets up:
+- OpenVPN server with EasyRSA PKI
+- MySQL/MariaDB database
+- Apache virtual host with PHP
+- Firewall (iptables NAT + forwarding)
+- **Fail2ban** with SSH and OpenVPN jails (5 attempts → 1-hour ban)
+- Sudoers entries for `easyrsa` and `fail2ban-client` so the web UI can manage both
+
 ---
 
 ## Admin Panel
@@ -65,10 +76,10 @@ Create your first admin account there. The page will redirect to the admin panel
 After logging in at `http://<your-server-ip>/`, the sidebar gives access to:
 
 ### Dashboard
-Live table of currently connected VPN clients — username, real IP address, bytes received/sent, and connection time. Refreshes every 10 seconds automatically.
+Live table of currently connected VPN clients — username, real IP address, bytes received/sent, and connection time. Refreshes every 10 seconds automatically. Stats cards at the top show total users, online now, disabled accounts, and log entries.
 
 ### Users
-Full user management: add users, reset passwords, set start/end dates, enable or disable accounts. Rows with expired end dates are highlighted automatically.
+Full user management: add users with optional email, reset passwords, set start/end dates, enable or disable accounts. Rows with expired end dates are highlighted. Super-admins receive an in-app notification whenever a user is added, edited, or deleted.
 
 ### Certificates
 Per-user certificate management backed by EasyRSA:
@@ -77,7 +88,17 @@ Per-user certificate management backed by EasyRSA:
 - **Download** a ready-to-use `.ovpn` file with the user's certificate embedded inline
 - **Email** the `.ovpn` file directly to the user (requires SMTP to be configured)
 
-> The installer automatically grants `www-data` passwordless sudo access to `easyrsa` via `/etc/sudoers.d/openvpn-admin`.
+> The installer grants `www-data` passwordless sudo access to `easyrsa` via `/etc/sudoers.d/openvpn-admin`.
+
+### Fail2Ban
+Manage fail2ban directly from the admin panel (super-admin only):
+- **Live jail status** — see every configured jail with currently banned IP count, currently failing count, and total bans ever
+- **Banned IP list** — each jail card lists all currently banned IPs
+- **Unban** — remove a ban instantly with a single click (confirm dialog)
+- **Manual ban** — enter any IPv4 or IPv6 address and choose which jail to add it to
+- Refreshes every 10 seconds automatically; manual refresh button also available
+
+> Requires `www-data` to have passwordless sudo access to `fail2ban-client`. The installer and updater configure this automatically via `/etc/sudoers.d/openvpn-admin`. On existing installs that predate this feature, run `sudo ./update.sh /var/www`.
 
 ### Logs
 Aggregated connection history per user: total sessions, data transferred, and last seen timestamp. Server-side paginated for large datasets.
@@ -86,6 +107,11 @@ Aggregated connection history per user: total sessions, data transferred, and la
 Manage web panel admin accounts. Each admin has a **role**:
 - `super-admin` — full read/write access to all pages
 - `read-only` — can view all pages but cannot make changes
+
+Role can be toggled per admin with the ↺ button. Admins cannot delete their own account.
+
+### Profile
+Any logged-in admin can update their own email address using the **Profile** button in the topbar. The email is used for SMTP-based notifications.
 
 ### Configs
 Edit the raw OpenVPN client configuration templates for GNU/Linux, Windows, and macOS directly in the browser. Changes are saved with a version history so you can review or restore previous configs.
@@ -118,8 +144,10 @@ sudo ./update.sh /var/www
 - Back up the current installation to `/root/openvpn-admin-backup-<timestamp>.tar.gz`
 - Copy updated web application files
 - Apply any pending database migrations automatically
+- Install fail2ban if not already present and write jail/filter config
+- Update `/etc/sudoers.d/openvpn-admin` to include both `easyrsa` and `fail2ban-client`
 - Patch `server.conf` for OpenVPN 2.5+ compatibility if needed
-- Add missing infrastructure (sudoers entry, log directory) for existing installs
+- Add missing infrastructure (log directory) for older installs
 - Reload Apache and restart OpenVPN if config changed
 
 ---
@@ -132,7 +160,24 @@ Removes all installed components: OpenVPN keys and configuration, the web applic
 sudo ./uninstall.sh /var/www
 ```
 
-The script will show a full list of what will be deleted and require you to type `yes` to confirm. Installed packages (`openvpn`, `apache2`, `mysql`/`mariadb`, `php`) are **not** removed.
+The script will show a full list of what will be deleted and require you to type `yes` to confirm. Installed packages (`openvpn`, `apache2`, `mysql`/`mariadb`, `php`, `fail2ban`) are **not** removed.
+
+---
+
+## Security
+
+The following hardening measures are built into the application:
+
+| Measure | Detail |
+|---|---|
+| **CSRF protection** | Every state-changing POST requires a per-session token validated server-side |
+| **Session cookies** | `HttpOnly`, `SameSite=Strict`, and `Secure` (auto-detected) set on every session |
+| **No password hashes in API** | `user_pass` and `admin_pass` are never included in JSON API responses |
+| **Role enforcement** | Every write endpoint calls `requireSuperAdmin()` before executing; role lookup fails closed to `read-only` |
+| **XSS prevention** | All user data entering the DOM uses jQuery `.text()` / `.attr()` — no string concatenation into HTML |
+| **Path traversal prevention** | Config file writes validate against an explicit allowlist of permitted paths |
+| **Input validation** | IP addresses validated with `FILTER_VALIDATE_IP`; jail names with `^[a-zA-Z0-9_-]+$`; all shell args use `escapeshellarg()` |
+| **Fail2ban** | SSH and OpenVPN jails active by default (5 attempts → 1-hour ban) |
 
 ---
 
@@ -141,13 +186,17 @@ The script will show a full list of what will be deleted and require you to type
 ```
 Browser ──► Apache ──► PHP (index.php / grids.php)
                           │
-                          ├── MySQL/MariaDB  (users, admins, logs, SMTP config)
+                          ├── MySQL/MariaDB  (users, admins, logs, notifications, SMTP config)
                           ├── /etc/openvpn/  (server.conf, certs, client configs)
-                          └── /var/log/openvpn/openvpn-status.log  (live dashboard)
+                          ├── /var/log/openvpn/openvpn-status.log  (live dashboard)
+                          └── fail2ban-client  (via sudo — jail status, ban, unban)
 
 OpenVPN server ──► connect.sh / disconnect.sh
                           │
                           └── notify.php  (sends email alerts via SMTP)
+
+fail2ban ──► /etc/fail2ban/filter.d/openvpn.conf  (watches openvpn.log)
+         └── /etc/fail2ban/jail.d/openvpn-admin.conf  (SSH + OpenVPN jails)
 ```
 
 Users authenticate to OpenVPN with username + password (no client certificate required by default). The `login.sh` script validates credentials against the database. The certificate management feature generates optional per-user certs for environments that require them.
@@ -174,5 +223,6 @@ Please open an issue at [github.com/arvage/OpenVPN-Admin/issues](https://github.
 - OS and version
 - PHP version (`php -v`)
 - MySQL/MariaDB version (`mysql --version`)
+- fail2ban version (`fail2ban-client --version`)
 - The error message or unexpected behaviour
 - Relevant Apache/PHP logs (`/var/log/apache2/error.log`)
