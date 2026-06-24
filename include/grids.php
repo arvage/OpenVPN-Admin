@@ -156,7 +156,9 @@
         }
         echo json_encode(['is_super' => true, 'count' => $unread, 'notifications' => $rows]);
       } catch (Exception $e) {
-        echo json_encode(['is_super' => false, 'count' => 0, 'notifications' => []]);
+        // Notification table not yet created — return is_super:true with empty list
+        // so the JS shows "No notifications yet" instead of being stuck on "Loading…"
+        echo json_encode(['is_super' => true, 'count' => 0, 'notifications' => [], 'setup_needed' => true]);
       }
     }
 

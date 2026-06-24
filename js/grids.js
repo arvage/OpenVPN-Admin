@@ -204,6 +204,7 @@ $(function () {
       $userTable.bootstrapTable('refresh');
       loadStats();
       toast('User added.', 'success');
+      refreshNotifications();
     }, 'json').fail(onError);
   });
 
@@ -234,6 +235,7 @@ $(function () {
       $modalUserEdit.hide();
       $userTable.bootstrapTable('refresh');
       toast('User updated.', 'success');
+      refreshNotifications();
     }).fail(onError);
   });
 
@@ -375,6 +377,7 @@ $(function () {
         $userTable.bootstrapTable('refresh');
         loadStats();
         toast('User deleted.', 'success');
+        refreshNotifications();
       }, 'json').fail(onError);
     } else if (_pendingDeleteType === 'admin') {
       $.post(gridsUrl, { del_admin: 1, del_admin_id: _pendingDeleteId }, function() {
@@ -736,6 +739,13 @@ $(function () {
       var $list = $('#notification-list');
       $list.find('li.notification-item').remove();
 
+      if (data.setup_needed) {
+        $list.append('<li class="notification-item px-3 py-2 text-muted small">' +
+          '<i class="bi bi-exclamation-triangle me-1 text-warning"></i>' +
+          'Run <code>sudo ./update.sh /var/www</code> to enable notifications.</li>');
+        return;
+      }
+
       if (!data.notifications || data.notifications.length === 0) {
         $list.append('<li class="notification-item px-3 py-2 text-muted small">No notifications yet.</li>');
       } else {
@@ -762,7 +772,9 @@ $(function () {
     });
   }
 
+  // Refresh and mark-read when the bell dropdown opens
   $('#notification-bell').on('click', function() {
+    refreshNotifications();
     if ($('#notification-count').is(':visible')) {
       $.post(gridsUrl, { mark_notifications_read: 1 }, function() {
         $('#notification-count').hide();
