@@ -325,11 +325,25 @@ function getHistory($cfg_file, $accordion_id, $open_first = false) {
               <span class="text-muted small">Notify super-admins when a user's details are changed</span>
             </label>
           </div>
-          <div class="form-check form-switch mb-4">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" id="notify_admin_user_delete" name="notify_admin_user_delete" <?= $adminRole!=='super-admin'?'disabled':'' ?>>
             <label class="form-check-label" for="notify_admin_user_delete">
               <strong>User Deleted</strong><br>
               <span class="text-muted small">Notify super-admins when a user is removed</span>
+            </label>
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="notify_admin_ban" name="notify_admin_ban" <?= $adminRole!=='super-admin'?'disabled':'' ?>>
+            <label class="form-check-label" for="notify_admin_ban">
+              <strong>IP Banned</strong><br>
+              <span class="text-muted small">Notify super-admins when an IP is banned via Fail2Ban</span>
+            </label>
+          </div>
+          <div class="form-check form-switch mb-4">
+            <input class="form-check-input" type="checkbox" id="notify_admin_unban" name="notify_admin_unban" <?= $adminRole!=='super-admin'?'disabled':'' ?>>
+            <label class="form-check-label" for="notify_admin_unban">
+              <strong>IP Unbanned</strong><br>
+              <span class="text-muted small">Notify super-admins when an IP is unbanned</span>
             </label>
           </div>
 

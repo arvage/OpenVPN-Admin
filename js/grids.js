@@ -559,6 +559,8 @@ $(function () {
       $('#notify_admin_user_add').prop('checked',    d.notify_admin_user_add    !== undefined ? !!parseInt(d.notify_admin_user_add)    : true);
       $('#notify_admin_user_edit').prop('checked',   d.notify_admin_user_edit   !== undefined ? !!parseInt(d.notify_admin_user_edit)   : false);
       $('#notify_admin_user_delete').prop('checked', d.notify_admin_user_delete !== undefined ? !!parseInt(d.notify_admin_user_delete) : true);
+      $('#notify_admin_ban').prop('checked',         d.notify_admin_ban         !== undefined ? !!parseInt(d.notify_admin_ban)         : true);
+      $('#notify_admin_unban').prop('checked',       d.notify_admin_unban       !== undefined ? !!parseInt(d.notify_admin_unban)       : true);
     });
   }
 
@@ -596,6 +598,8 @@ $(function () {
       notify_admin_user_add:     $('#notify_admin_user_add').is(':checked') ? 1 : 0,
       notify_admin_user_edit:    $('#notify_admin_user_edit').is(':checked') ? 1 : 0,
       notify_admin_user_delete:  $('#notify_admin_user_delete').is(':checked') ? 1 : 0,
+      notify_admin_ban:          $('#notify_admin_ban').is(':checked') ? 1 : 0,
+      notify_admin_unban:        $('#notify_admin_unban').is(':checked') ? 1 : 0,
     }, function() {
       toast('Notification settings saved.', 'success');
     }, 'json').fail(onError).always(function() { $btn.prop('disabled', false); });
@@ -720,6 +724,7 @@ $(function () {
       if (r.ok) {
         toast('Unbanned ' + ip, 'success');
         loadFail2Ban();
+        refreshNotifications();
       } else {
         toast('Failed to unban: ' + (r.error || r.output || 'unknown error'), 'danger');
         $btn.prop('disabled', false).text('Unban');
@@ -739,6 +744,7 @@ $(function () {
         $('#ban-ip-address').val('');
         toast('Banned ' + ip + ' in jail "' + jail + '"', 'success');
         loadFail2Ban();
+        refreshNotifications();
       } else {
         toast('Failed to ban: ' + (r.error || r.output || 'unknown error'), 'danger');
       }
@@ -779,11 +785,15 @@ $(function () {
         $.each(data.notifications, function(i, n) {
           var icon, iconClass;
           if (n.notification_type === 'add_user') {
-            icon = 'person-plus'; iconClass = 'text-success';
+            icon = 'person-plus';  iconClass = 'text-success';
           } else if (n.notification_type === 'del_user') {
-            icon = 'person-x'; iconClass = 'text-danger';
+            icon = 'person-x';     iconClass = 'text-danger';
+          } else if (n.notification_type === 'ban_ip') {
+            icon = 'shield-x';     iconClass = 'text-danger';
+          } else if (n.notification_type === 'unban_ip') {
+            icon = 'shield-check'; iconClass = 'text-success';
           } else {
-            icon = 'pencil'; iconClass = 'text-primary';
+            icon = 'pencil';       iconClass = 'text-primary';
           }
           var cls = n.is_read ? '' : 'notif-unread';
           $list.append(

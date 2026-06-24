@@ -32,6 +32,8 @@
       'add_user'  => 'notify_admin_user_add',
       'edit_user' => 'notify_admin_user_edit',
       'del_user'  => 'notify_admin_user_delete',
+      'ban_ip'    => 'notify_admin_ban',
+      'unban_ip'  => 'notify_admin_unban',
     ];
     $col = $col_map[$type] ?? null;
     if ($col) {
@@ -307,6 +309,7 @@
     }
     $output = @shell_exec('sudo fail2ban-client set ' . escapeshellarg($jail) . ' banip ' . escapeshellarg($ip) . ' 2>&1');
     $ok = ($output !== null && stripos($output, 'error') === false);
+    if ($ok) createNotification($bdd, 'ban_ip', $ip, $ip . ' banned in jail "' . $jail . '" by ' . $_SESSION['admin_id']);
     echo json_encode(['ok' => $ok, 'output' => htmlspecialchars($output ?? '', ENT_QUOTES, 'UTF-8')]);
   }
 
@@ -323,6 +326,7 @@
     }
     $output = @shell_exec('sudo fail2ban-client set ' . escapeshellarg($jail) . ' unbanip ' . escapeshellarg($ip) . ' 2>&1');
     $ok = ($output !== null && stripos($output, 'error') === false);
+    if ($ok) createNotification($bdd, 'unban_ip', $ip, $ip . ' unbanned from jail "' . $jail . '" by ' . $_SESSION['admin_id']);
     echo json_encode(['ok' => $ok, 'output' => htmlspecialchars($output ?? '', ENT_QUOTES, 'UTF-8')]);
   }
 
@@ -397,9 +401,11 @@
     $n_admin_add      = intval($_POST['notify_admin_user_add']   ?? 1);
     $n_admin_edit     = intval($_POST['notify_admin_user_edit']  ?? 0);
     $n_admin_delete   = intval($_POST['notify_admin_user_delete']?? 1);
+    $n_admin_ban      = intval($_POST['notify_admin_ban']        ?? 1);
+    $n_admin_unban    = intval($_POST['notify_admin_unban']      ?? 1);
 
-    $fields = 'smtp_host=?, smtp_port=?, smtp_user=?, smtp_from=?, smtp_from_name=?, smtp_secure=?, notify_connect=?, notify_disconnect=?, notify_expiry=?, notify_admin_user_add=?, notify_admin_user_edit=?, notify_admin_user_delete=?';
-    $vals   = [$host, $port, $smtp_user, $from, $from_name, $secure, $n_connect, $n_disconnect, $n_expiry, $n_admin_add, $n_admin_edit, $n_admin_delete];
+    $fields = 'smtp_host=?, smtp_port=?, smtp_user=?, smtp_from=?, smtp_from_name=?, smtp_secure=?, notify_connect=?, notify_disconnect=?, notify_expiry=?, notify_admin_user_add=?, notify_admin_user_edit=?, notify_admin_user_delete=?, notify_admin_ban=?, notify_admin_unban=?';
+    $vals   = [$host, $port, $smtp_user, $from, $from_name, $secure, $n_connect, $n_disconnect, $n_expiry, $n_admin_add, $n_admin_edit, $n_admin_delete, $n_admin_ban, $n_admin_unban];
 
     // Only update password if a new one was provided
     if (!empty($_POST['smtp_pass'])) {
