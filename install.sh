@@ -85,27 +85,21 @@ sleep 1
 
 # ─── Public IP / hostname prompt ──────────────────────────────────────────────
 echo -e "${Red}$public_ip${NC} detected as your Public IP."
-echo -e "Need to use a different IP or hostname? (Timeout: 2 min)"
-read -t 120 -p "Press Enter to use detected IP, or type another: " public_hostname </dev/tty || true
+read -p "Press Enter to accept, or type a different IP/hostname: " public_hostname </dev/tty
 
 if [ -n "$public_hostname" ]; then
   public_ip="$public_hostname"
-  echo -e "\n${NC}Using: ${Red}$public_ip${NC}"
-else
-  echo -e "\n${NC}Using: ${Red}$public_ip${NC}"
 fi
+echo -e "Using: ${Red}$public_ip${NC}"
 
 # ─── VPN connection name ──────────────────────────────────────────────────────
 echo -e "\nEnter a VPN connection name shown to users (e.g. 'LA Office')."
-echo -e "Leave blank for default 'VPN'. (Timeout: 2 min)"
-read -t 120 -p "VPN name (without .ovpn): " company_name </dev/tty || true
+read -p "VPN name [VPN]: " company_name </dev/tty
 
 if [ -z "$company_name" ]; then
   company_name="VPN"
-  echo -e "\nUsing default: VPN.ovpn"
-else
-  echo -e "\nUsing: ${Red}$company_name.ovpn${NC}"
 fi
+echo -e "Using: ${Red}$company_name.ovpn${NC}"
 
 echo -e "${Yellow}\nThis will take a few minutes.\n${NC}"
 echo -e "${NC}Detected OS: ${Red}$OS $OS_Version_Major.$OS_Version_Minor${NC}\n"
@@ -124,7 +118,8 @@ case $OS in
       openvpn apache2 mysql-server \
       php php-mysql php-zip php-mbstring \
       unzip git wget curl net-tools \
-      iptables-persistent ca-certificates
+      iptables-persistent ca-certificates \
+      fail2ban
 
     # Blacklist floppy only on x86 (not on ARM or VM without floppy)
     if [ "$(uname -m)" != "aarch64" ] && [ "$(uname -m)" != "armv7l" ]; then
@@ -139,7 +134,8 @@ case $OS in
       openvpn apache2 mariadb-server \
       php php-mysql php-zip php-mbstring \
       unzip git wget curl net-tools \
-      iptables-persistent ca-certificates
+      iptables-persistent ca-certificates \
+      fail2ban
     ;;
 
   Debian)
@@ -148,7 +144,8 @@ case $OS in
       openvpn apache2 mariadb-server \
       php php-mysql php-zip php-mbstring \
       unzip git wget curl net-tools \
-      iptables-persistent ca-certificates
+      iptables-persistent ca-certificates \
+      fail2ban
     ;;
 esac
 
@@ -390,9 +387,10 @@ truncate -s -1 "$openvpn_admin/client-conf/windows/filename"
 
 chown -R "$user:$group" "$openvpn_admin"
 
-# ─── sudoers for EasyRSA (required for web UI certificate management) ─────────
+# ─── sudoers: EasyRSA + fail2ban-client (required for web UI) ────────────────
 cat > /etc/sudoers.d/openvpn-admin <<-EOF
 $user ALL=(ALL) NOPASSWD: /etc/openvpn/easy-rsa/easyrsa
+$user ALL=(ALL) NOPASSWD: /usr/bin/fail2ban-client
 EOF
 chmod 440 /etc/sudoers.d/openvpn-admin
 
@@ -442,6 +440,45 @@ echo -e "${Green}Starting OpenVPN...${NC}"
 systemctl enable openvpn@server
 systemctl start  openvpn@server
 
+# ─── Fail2Ban ─────────────────────────────────────────────────────────────────
+echo -e "${Green}Configuring Fail2Ban...${NC}"
+
+# Custom filter: catches OpenVPN auth failures and TLS handshake errors in the
+# server log. Matches lines like: "1.2.3.4:54321 TLS Auth Error: ..."
+cat > /etc/fail2ban/filter.d/openvpn.conf <<-'FILTER'
+[Definition]
+failregex = <HOST>:\d+ TLS Auth Error:
+            <HOST>:\d+ AUTH_FAILED
+            <HOST>:\d+ TLS Error: TLS key negotiation failed
+ignoreregex =
+FILTER
+
+# Jail configuration: SSH (default) + OpenVPN
+cat > /etc/fail2ban/jail.d/openvpn-admin.conf <<-JAILCONF
+[DEFAULT]
+bantime  = 3600
+findtime = 600
+maxretry = 5
+banaction = iptables-multiport
+
+[sshd]
+enabled  = true
+port     = ssh
+logpath  = %(sshd_log)s
+backend  = %(sshd_backend)s
+
+[openvpn]
+enabled  = true
+port     = $server_port
+protocol = $openvpn_proto
+filter   = openvpn
+logpath  = /var/log/openvpn/openvpn.log
+maxretry = 5
+JAILCONF
+
+systemctl enable fail2ban
+systemctl restart fail2ban
+
 # ─── Save credentials ─────────────────────────────────────────────────────────
 {
   echo "Auto Generated MySQL Root Password: $mysql_root_pass"
@@ -467,6 +504,8 @@ echo
 echo -e "  ${Yellow}Security reminders:${NC}"
 echo -e "    - Only forward UDP port $server_port externally (not port 80)"
 echo -e "    - Credentials saved to ${Red}~/OpenVPN_Creds${NC} — delete after noting them"
+echo -e "    - Fail2Ban is active: SSH + OpenVPN jails (5 attempts → 1h ban)"
+echo -e "      Manage bans via the admin panel under ${Red}Fail2Ban${NC} in the sidebar"
 echo
 echo -e "  Generated credentials:"
 echo -e "    MySQL root password:   ${Red}$mysql_root_pass${NC}"
