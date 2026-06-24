@@ -317,6 +317,56 @@ function getHistory($cfg_file, $accordion_id, $open_first = false) {
     </div>
   </div>
 
+  <!-- ═══════════════ FAIL2BAN ═══════════════ -->
+  <div id="page-fail2ban" class="tab-pane-page <?= $page==='fail2ban'?'active':'' ?>">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0 fw-semibold"><i class="bi bi-shield-x me-2 text-danger"></i>Fail2Ban</h6>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-fail2ban">
+          <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
+        <?php if($adminRole === 'super-admin'): ?>
+        <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modal-ban-ip">
+          <i class="bi bi-shield-x me-1"></i>Ban IP
+        </button>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div id="fail2ban-sudo-note" class="alert alert-info d-none small">
+      <i class="bi bi-info-circle me-2"></i>
+      Grant the web server sudo access to fail2ban-client:
+      <pre class="mb-0 mt-1 bg-dark text-light p-2 rounded small">echo "www-data ALL=(ALL) NOPASSWD: /usr/bin/fail2ban-client" | sudo tee /etc/sudoers.d/openvpn-admin-fail2ban
+sudo chmod 440 /etc/sudoers.d/openvpn-admin-fail2ban</pre>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="row g-3 mb-3" id="fail2ban-summary" style="display:none!important">
+      <div class="col-auto">
+        <div class="stat-card">
+          <div class="stat-value text-danger" id="f2b-total-banned">–</div>
+          <div class="stat-label">Currently Banned</div>
+        </div>
+      </div>
+      <div class="col-auto">
+        <div class="stat-card">
+          <div class="stat-value" id="f2b-jail-count">–</div>
+          <div class="stat-label">Active Jails</div>
+        </div>
+      </div>
+      <div class="col-auto">
+        <div class="stat-card stat-disabled">
+          <div class="stat-value" id="f2b-total-failed">–</div>
+          <div class="stat-label">Currently Failing</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="fail2ban-status">
+      <div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</div>
+    </div>
+  </div>
+
 </div><!-- /.tab-content -->
 
 
@@ -499,6 +549,36 @@ function getHistory($cfg_file, $accordion_id, $open_first = false) {
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-success" id="modal-cert-gen-btn">
           <i class="bi bi-cpu me-1"></i>Generate
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ban IP Modal (Fail2Ban) -->
+<div id="modal-ban-ip" class="modal fade" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-shield-x me-2 text-danger"></i>Ban IP Address</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">IP Address</label>
+          <input type="text" id="ban-ip-address" class="form-control font-monospace" placeholder="e.g. 1.2.3.4 or 2001:db8::1" autofocus/>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Jail</label>
+          <select id="ban-ip-jail" class="form-select">
+            <option value="">— select jail —</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="fail2ban-ban-save">
+          <i class="bi bi-shield-x me-1"></i>Ban
         </button>
       </div>
     </div>

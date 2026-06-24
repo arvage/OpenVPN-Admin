@@ -69,6 +69,7 @@ $(function () {
     loadStats();
     if (currentPage === 'dashboard') loadDashboard();
     if (currentPage === 'users')     $userTable.bootstrapTable('refresh');
+    if (currentPage === 'fail2ban')  loadFail2Ban();
   }, 10000);
 
 
@@ -584,6 +585,143 @@ $(function () {
 
 
   // ════════════════════ NOTIFICATIONS ════════════════════
+
+  // ════════════════════ FAIL2BAN ════════════════════
+
+  function loadFail2Ban() {
+    var $status  = $('#fail2ban-status');
+    var $summary = $('#fail2ban-summary');
+
+    $.getJSON(gridsUrl, { select: 'fail2ban' }, function(data) {
+      $status.empty();
+
+      if (data.error) {
+        $('#fail2ban-sudo-note').removeClass('d-none');
+        $status.html(
+          '<div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-2"></i>' +
+          $('<span>').text(data.error).html() + '</div>'
+        );
+        $summary.hide();
+        return;
+      }
+
+      $('#fail2ban-sudo-note').addClass('d-none');
+
+      if (!data.jails || data.jails.length === 0) {
+        $status.html('<div class="alert alert-info small"><i class="bi bi-info-circle me-2"></i>No fail2ban jails are configured.</div>');
+        $summary.hide();
+        return;
+      }
+
+      // Update summary stats
+      var totalFailed = data.jails.reduce(function(s, j) { return s + j.currently_failed; }, 0);
+      $('#f2b-total-banned').text(data.total_banned);
+      $('#f2b-jail-count').text(data.jails.length);
+      $('#f2b-total-failed').text(totalFailed);
+      $summary.css('display', '');
+
+      // Populate jail select in Ban modal
+      var $jailSel = $('#ban-ip-jail');
+      var prev = $jailSel.val();
+      $jailSel.empty();
+      data.jails.forEach(function(j) {
+        $('<option>').val(j.jail).text(j.jail).appendTo($jailSel);
+      });
+      if (prev) $jailSel.val(prev);
+
+      // Render per-jail cards
+      data.jails.forEach(function(jail) {
+        var hasBans   = jail.currently_banned > 0;
+        var headerCls = hasBans ? 'bg-danger text-white' : 'bg-light';
+
+        var $card   = $('<div class="card mb-3 shadow-sm">');
+        var $header = $('<div class="card-header d-flex justify-content-between align-items-center py-2 ' + headerCls + '">');
+        $('<strong class="font-monospace">').text(jail.jail).appendTo($header);
+        var $meta = $('<div class="d-flex gap-3 small">');
+        $('<span>').html('<i class="bi bi-shield-x me-1"></i>' + jail.currently_banned + ' banned').appendTo($meta);
+        $('<span>').html('<i class="bi bi-exclamation-triangle me-1"></i>' + jail.currently_failed + ' failing').appendTo($meta);
+        $('<span class="' + (hasBans ? 'opacity-75' : 'text-muted') + '">').text('ever: ' + jail.total_banned).appendTo($meta);
+        $meta.appendTo($header);
+        $card.append($header);
+
+        var $body = $('<div class="card-body p-0">');
+        if (jail.banned_ips.length === 0) {
+          $('<p class="text-muted small m-3 mb-2">').text('No IPs currently banned in this jail.').appendTo($body);
+        } else {
+          var $tbl   = $('<table class="table table-sm table-hover mb-0">');
+          var $tbody = $('<tbody>');
+          jail.banned_ips.forEach(function(ip) {
+            var $tr = $('<tr>');
+            $('<td class="ps-3 align-middle">').append($('<code>').text(ip)).appendTo($tr);
+            var $td = $('<td class="text-end pe-3 align-middle">');
+            $('<button class="btn btn-sm btn-outline-danger fail2ban-unban-btn" style="padding:1px 10px;font-size:0.75em">')
+              .text('Unban')
+              .attr({ 'data-ip': ip, 'data-jail': jail.jail })
+              .appendTo($td);
+            $tr.append($td);
+            $tbody.append($tr);
+          });
+          $tbl.append($tbody);
+          $body.append($tbl);
+        }
+        $card.append($body);
+        $status.append($card);
+      });
+
+    }).fail(function() {
+      $('#fail2ban-status').html('<div class="alert alert-danger small">Failed to contact fail2ban endpoint.</div>');
+    });
+  }
+
+  if (currentPage === 'fail2ban') loadFail2Ban();
+
+  $('#btn-refresh-fail2ban').on('click', function() {
+    loadFail2Ban();
+    toast('Refreshed', 'secondary');
+  });
+
+  // Unban
+  $(document).on('click', '.fail2ban-unban-btn', function() {
+    var ip   = $(this).data('ip');
+    var jail = $(this).data('jail');
+    if (!confirm('Unban ' + ip + ' from jail "' + jail + '"?')) return;
+    var $btn = $(this).prop('disabled', true).text('Unbanning…');
+    $.post(gridsUrl, { unban_ip: 1, ip: ip, jail: jail }, function(r) {
+      if (r.ok) {
+        toast('Unbanned ' + ip, 'success');
+        loadFail2Ban();
+      } else {
+        toast('Failed to unban: ' + (r.error || r.output || 'unknown error'), 'danger');
+        $btn.prop('disabled', false).text('Unban');
+      }
+    }, 'json').fail(onError);
+  });
+
+  // Ban
+  $('#fail2ban-ban-save').on('click', function() {
+    var ip   = $('#ban-ip-address').val().trim();
+    var jail = $('#ban-ip-jail').val();
+    if (!ip || !jail) { toast('Enter an IP address and select a jail.', 'warning'); return; }
+    var $btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Banning…');
+    $.post(gridsUrl, { ban_ip: 1, ip: ip, jail: jail }, function(r) {
+      if (r.ok) {
+        bootstrap.Modal.getInstance('#modal-ban-ip').hide();
+        $('#ban-ip-address').val('');
+        toast('Banned ' + ip + ' in jail "' + jail + '"', 'success');
+        loadFail2Ban();
+      } else {
+        toast('Failed to ban: ' + (r.error || r.output || 'unknown error'), 'danger');
+      }
+    }, 'json').fail(onError).always(function() {
+      $btn.prop('disabled', false).html('<i class="bi bi-shield-x me-1"></i>Ban');
+    });
+  });
+
+  // Clear input when modal opens
+  $(document).on('show.bs.modal', '#modal-ban-ip', function() {
+    $('#ban-ip-address').val('');
+  });
+
 
   function refreshNotifications() {
     $.getJSON(gridsUrl, { select: 'notifications' }, function(data) {

@@ -361,6 +361,25 @@ tr.user-expired td:first-child {
   }
 }
 
+/* Fail2Ban */
+#fail2ban-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+#fail2ban-summary .stat-card {
+  min-width: 120px;
+}
+#page-fail2ban .card-header strong {
+  font-size: 0.9em;
+  letter-spacing: 0.02em;
+}
+#page-fail2ban .card-header .small {
+  font-size: 0.8em;
+  opacity: 0.9;
+}
+
 /* Notification unread highlight */
 .notif-unread {
   background-color: #eef5ff;

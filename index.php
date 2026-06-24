@@ -98,7 +98,7 @@
   $adminRole = $isAdmin ? getCurrentAdminRole($bdd) : null;
 
   $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
-  $valid_pages = ['dashboard', 'users', 'logs', 'admins', 'configs', 'filename', 'certificates', 'settings'];
+  $valid_pages = ['dashboard', 'users', 'logs', 'admins', 'configs', 'filename', 'certificates', 'settings', 'fail2ban'];
   if (!in_array($page, $valid_pages)) $page = 'dashboard';
 
   $page_titles = [
@@ -110,6 +110,7 @@
     'filename'     => 'File Name',
     'certificates' => 'Certificates',
     'settings'     => 'Settings',
+    'fail2ban'     => 'Fail2Ban',
   ];
   $topbar_title = $page_titles[$page] ?? 'Dashboard';
 ?>
@@ -217,6 +218,11 @@
         <li class="<?= $page==='certificates'?'active':'' ?>">
           <a href="index.php?admin&page=certificates">
             <i class="bi bi-patch-check"></i> Certificates
+          </a>
+        </li>
+        <li class="<?= $page==='fail2ban'?'active':'' ?>">
+          <a href="index.php?admin&page=fail2ban">
+            <i class="bi bi-shield-x"></i> Fail2Ban
           </a>
         </li>
         <li class="nav-section-label">Administration</li>

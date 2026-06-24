@@ -174,6 +174,53 @@
     }
   }
 
+  function getFail2BanStatus(): array {
+    $out = @shell_exec('sudo fail2ban-client status 2>&1');
+    if ($out === null || trim($out) === '') {
+      return ['error' => 'fail2ban-client unavailable. Ensure fail2ban is installed and the web server has passwordless sudo access to fail2ban-client.'];
+    }
+    if (preg_match('/command not found|No such file/i', $out)) {
+      return ['error' => 'fail2ban-client not found. Install it: sudo apt install fail2ban'];
+    }
+    if (preg_match('/Connection refused|not running|Failed to connect/i', $out)) {
+      return ['error' => 'fail2ban is not running. Start it: sudo systemctl start fail2ban'];
+    }
+
+    if (!preg_match('/Jail list:\s*(.+)/i', $out, $m)) {
+      if (preg_match('/Number of jail:\s*0/i', $out)) {
+        return ['jails' => [], 'total_banned' => 0];
+      }
+      return ['error' => 'Could not parse fail2ban output.', 'raw' => htmlspecialchars($out, ENT_QUOTES, 'UTF-8')];
+    }
+
+    $jail_names = array_values(array_filter(array_map('trim', explode(',', $m[1]))));
+    $jails = [];
+    $total_banned = 0;
+
+    foreach ($jail_names as $jail) {
+      if (!preg_match('/^[a-zA-Z0-9_-]+$/', $jail)) continue;
+      $jout = @shell_exec('sudo fail2ban-client status ' . escapeshellarg($jail) . ' 2>&1');
+
+      $banned_now = 0; $total_fail = 0; $failed_now = 0; $banned_ips = [];
+      if (preg_match('/Currently banned:\s*(\d+)/i',  $jout, $mm)) $banned_now = intval($mm[1]);
+      if (preg_match('/Total banned:\s*(\d+)/i',      $jout, $mm)) $total_fail = intval($mm[1]);
+      if (preg_match('/Currently failed:\s*(\d+)/i',  $jout, $mm)) $failed_now = intval($mm[1]);
+      if (preg_match('/Banned IP list:\s*([^\n]+)/i', $jout, $mm)) {
+        $banned_ips = array_values(array_filter(preg_split('/\s+/', trim($mm[1]))));
+      }
+      $total_banned += $banned_now;
+      $jails[] = [
+        'jail'              => $jail,
+        'currently_banned'  => $banned_now,
+        'total_banned'      => $total_fail,
+        'currently_failed'  => $failed_now,
+        'banned_ips'        => $banned_ips,
+      ];
+    }
+
+    return ['jails' => $jails, 'total_banned' => $total_banned];
+  }
+
   function getSmtpSettings($bdd): array {
     try {
       $req = $bdd->query('SELECT * FROM smtp_settings WHERE id = 1');

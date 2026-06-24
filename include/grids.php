@@ -160,6 +160,11 @@
       }
     }
 
+    else if ($sel === 'fail2ban') {
+      requireSuperAdmin($bdd);
+      echo json_encode(getFail2BanStatus());
+    }
+
     else if ($sel === 'my_profile') {
       $req = $bdd->prepare('SELECT admin_id, admin_mail FROM admin WHERE admin_id = ?');
       $req->execute([$_SESSION['admin_id']]);
@@ -270,6 +275,38 @@
     $req = $bdd->prepare('DELETE FROM admin WHERE admin_id = ?');
     $req->execute([$_POST['del_admin_id']]);
     echo json_encode(['ok' => true]);
+  }
+
+  // ---- BAN IP (fail2ban) ----
+  else if (isset($_POST['ban_ip'])) {
+    requireSuperAdmin($bdd);
+    $ip   = trim($_POST['ip']   ?? '');
+    $jail = trim($_POST['jail'] ?? '');
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+      echo json_encode(['ok' => false, 'error' => 'Invalid IP address.']); exit;
+    }
+    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $jail)) {
+      echo json_encode(['ok' => false, 'error' => 'Invalid jail name.']); exit;
+    }
+    $output = @shell_exec('sudo fail2ban-client set ' . escapeshellarg($jail) . ' banip ' . escapeshellarg($ip) . ' 2>&1');
+    $ok = ($output !== null && stripos($output, 'error') === false);
+    echo json_encode(['ok' => $ok, 'output' => htmlspecialchars($output ?? '', ENT_QUOTES, 'UTF-8')]);
+  }
+
+  // ---- UNBAN IP (fail2ban) ----
+  else if (isset($_POST['unban_ip'])) {
+    requireSuperAdmin($bdd);
+    $ip   = trim($_POST['ip']   ?? '');
+    $jail = trim($_POST['jail'] ?? '');
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+      echo json_encode(['ok' => false, 'error' => 'Invalid IP address.']); exit;
+    }
+    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $jail)) {
+      echo json_encode(['ok' => false, 'error' => 'Invalid jail name.']); exit;
+    }
+    $output = @shell_exec('sudo fail2ban-client set ' . escapeshellarg($jail) . ' unbanip ' . escapeshellarg($ip) . ' 2>&1');
+    $ok = ($output !== null && stripos($output, 'error') === false);
+    echo json_encode(['ok' => $ok, 'output' => htmlspecialchars($output ?? '', ENT_QUOTES, 'UTF-8')]);
   }
 
   // ---- MARK NOTIFICATIONS READ ----
