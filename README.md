@@ -137,6 +137,8 @@ Two independent groups of notification toggles:
 - **User Added** — notify when a new user is created (default on)
 - **User Edited** — notify when a user's details are changed (default off)
 - **User Deleted** — notify when a user is removed (default on)
+- **IP Banned** — notify when an IP is banned via the Fail2Ban page (default on)
+- **IP Unbanned** — notify when an IP is unbanned (default on)
 
 > Connect/disconnect email notifications require the OpenVPN server scripts to be in place. The installer sets this up automatically via `/etc/openvpn/scripts/connect.sh` and `disconnect.sh`.
 

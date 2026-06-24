@@ -1,5 +1,13 @@
 # OpenVPN-Admin Version History
 
+## 1.1.2
+
+- **Ban/unban notifications** — banning or unbanning an IP via the Fail2Ban page now creates an in-app notification for super-admins; the bell refreshes immediately after the action
+- Two new toggles in Settings → Notifications (Admin Notifications section): **IP Banned** (default on) and **IP Unbanned** (default on); backed by `notify_admin_ban` / `notify_admin_unban` columns (schema-13)
+- Bell dropdown shows a red shield (🛡✕) for bans and a green shield (🛡✓) for unbans
+
+---
+
 ## 1.1.1
 
 ### New Features
