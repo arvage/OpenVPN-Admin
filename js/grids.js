@@ -297,19 +297,23 @@ $(function () {
   // ════════════════════ ADMINS ════════════════════
 
   var $adminTable = $('#table-admins');
-  var $modalAdminAdd = new bootstrap.Modal('#modal-admin-add');
+  var $modalAdminAdd  = new bootstrap.Modal('#modal-admin-add');
+  var $modalAdminEdit = new bootstrap.Modal('#modal-admin-edit');
 
   function adminActionsFormatter(val, row) {
-    if (!isSuperAdmin || row.admin_id === (window._currentAdmin || '')) {
-      return '<span class="text-muted small">–</span>';
-    }
+    if (!isSuperAdmin) return '<span class="text-muted small">–</span>';
     var $wrap = $('<span>');
-    $('<button class="btn btn-sm btn-outline-secondary me-1 admin-role-btn" style="padding:1px 6px;font-size:0.75em" title="Toggle Role"><i class="bi bi-arrow-repeat"></i></button>')
-      .attr({ 'data-id': row.admin_id, 'data-role': row.admin_role })
+    $('<button class="btn btn-sm btn-outline-primary me-1 admin-edit-btn" style="padding:1px 6px;font-size:0.75em" title="Edit Email"><i class="bi bi-pencil"></i></button>')
+      .attr({ 'data-id': row.admin_id, 'data-mail': row.admin_mail || '' })
       .appendTo($wrap);
-    $('<button class="btn btn-sm btn-outline-danger admin-del-btn" style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>')
-      .attr('data-id', row.admin_id)
-      .appendTo($wrap);
+    if (row.admin_id !== (window._currentAdmin || '')) {
+      $('<button class="btn btn-sm btn-outline-secondary me-1 admin-role-btn" style="padding:1px 6px;font-size:0.75em" title="Toggle Role"><i class="bi bi-arrow-repeat"></i></button>')
+        .attr({ 'data-id': row.admin_id, 'data-role': row.admin_role })
+        .appendTo($wrap);
+      $('<button class="btn btn-sm btn-outline-danger admin-del-btn" style="padding:1px 6px;font-size:0.75em" title="Delete"><i class="bi bi-trash"></i></button>')
+        .attr('data-id', row.admin_id)
+        .appendTo($wrap);
+    }
     return $wrap.html();
   }
 
@@ -359,6 +363,22 @@ $(function () {
     _pendingDeleteId   = $(this).data('id');
     $('#modal-confirm-delete-name').text(_pendingDeleteId);
     $confirmModal.show();
+  });
+
+  $(document).on('click', '.admin-edit-btn', function() {
+    $('#edit-admin-pk').val($(this).data('id'));
+    $('#edit-admin-mail').val($(this).data('mail'));
+    $modalAdminEdit.show();
+  });
+
+  $('#modal-admin-edit-save').on('click', function() {
+    var pk   = $('#edit-admin-pk').val();
+    var mail = $('#edit-admin-mail').val().trim();
+    $.post(gridsUrl, { set_admin: 1, name: 'admin_mail', value: mail, pk: pk }, function() {
+      $modalAdminEdit.hide();
+      $adminTable.bootstrapTable('refresh');
+      toast('Email updated for ' + pk + '.', 'success');
+    }, 'json').fail(onError);
   });
 
   $(document).on('click', '.admin-role-btn', function() {

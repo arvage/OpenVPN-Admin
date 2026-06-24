@@ -492,6 +492,31 @@ sudo chmod 440 /etc/sudoers.d/openvpn-admin-fail2ban</pre>
   </div>
 </div>
 
+<!-- Edit Admin Email Modal -->
+<div id="modal-admin-edit" class="modal fade" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit Admin Email</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-admin-pk"/>
+        <div class="mb-3">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="edit-admin-mail" class="form-control" placeholder="admin@example.com" autofocus/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="modal-admin-edit-save">
+          <i class="bi bi-floppy me-1"></i>Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Add Admin Modal -->
 <div id="modal-admin-add" class="modal fade" tabindex="-1">
   <div class="modal-dialog">
