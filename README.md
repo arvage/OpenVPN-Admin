@@ -108,10 +108,13 @@ Manage web panel admin accounts. Each admin has a **role**:
 - `super-admin` — full read/write access to all pages
 - `read-only` — can view all pages but cannot make changes
 
-Role can be toggled per admin with the ↺ button. Admins cannot delete their own account.
+Each row has three action buttons:
+- ✏ **Edit email** — update that admin's email address
+- ↺ **Toggle role** — switch between `super-admin` and `read-only`
+- 🗑 **Delete** — remove the admin account (hidden for your own row)
 
 ### Profile
-Any logged-in admin can update their own email address using the **Profile** button in the topbar. The email is used for SMTP-based notifications.
+Any logged-in admin can update their own email address using the **Profile** button in the topbar. Super-admins can also edit any other admin's email directly from the Admins grid.
 
 ### Configs
 Edit the raw OpenVPN client configuration templates for GNU/Linux, Windows, and macOS directly in the browser. Changes are saved with a version history so you can review or restore previous configs.
@@ -123,12 +126,19 @@ Configure outgoing email:
 - Send a test email to verify settings
 
 ### Settings → Notifications
-Toggle email alerts sent to the user's registered address:
+Two independent groups of notification toggles:
+
+**Email notifications** (sent to the user's registered address):
 - **On Connect** — email when the user connects to VPN
 - **On Disconnect** — email when the user disconnects
 - **Account Expiry** — email 7 days before the account's end date
 
-> Connect/disconnect notifications require the OpenVPN server scripts to be in place. The installer sets this up automatically via `/etc/openvpn/scripts/connect.sh` and `disconnect.sh`.
+**Admin notifications** (in-app bell, super-admins only):
+- **User Added** — notify when a new user is created (default on)
+- **User Edited** — notify when a user's details are changed (default off)
+- **User Deleted** — notify when a user is removed (default on)
+
+> Connect/disconnect email notifications require the OpenVPN server scripts to be in place. The installer sets this up automatically via `/etc/openvpn/scripts/connect.sh` and `disconnect.sh`.
 
 ---
 
@@ -136,11 +146,10 @@ Toggle email alerts sent to the user's registered address:
 
 ```bash
 cd ~/openvpn-admin
-git pull origin master
 sudo ./update.sh /var/www
 ```
 
-`update.sh` will:
+`update.sh` pulls the latest code from git automatically before applying the update, so a single command is all that is needed. It will:
 - Back up the current installation to `/root/openvpn-admin-backup-<timestamp>.tar.gz`
 - Copy updated web application files
 - Apply any pending database migrations automatically

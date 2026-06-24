@@ -1,5 +1,21 @@
 # OpenVPN-Admin Version History
 
+## 1.1.1
+
+### New Features
+- **Admin email editing from the Admins grid** — each row in the Web Admins table now has a pencil button that opens a modal pre-filled with the admin's current email; super-admins can update any other admin's email without needing that admin to log in and use their own Profile button
+- **Per-type admin notification toggles** — Settings → Notifications now has a second section ("Admin Notifications") with three toggle switches controlling which user events create in-app bell notifications for super-admins: User Added (default on), User Edited (default off), User Deleted (default on); backed by new `smtp_settings` columns (schema-12)
+
+### Fixes
+- **Notifications not appearing after user actions** — `refreshNotifications()` was never called after add/edit/delete user, so the bell badge only updated on the 30-second background poll; now refreshes immediately after each action
+- **Bell stuck on "Loading…" when notification table missing** — `?select=notifications` catch block returned `is_super:false` on DB error, causing JS to bail silently; now returns `is_super:true` with a `setup_needed` flag so the dropdown shows an actionable message instead
+- **Bell dropdown always fresh on open** — clicking the bell now fetches notifications immediately regardless of when the 30-second poll last ran
+
+### Updater
+- **`update.sh` now pulls from git automatically** — running `sudo ./update.sh /var/www` is the only command needed to go from any state to fully up-to-date; a separate `git pull` is no longer required
+
+---
+
 ## 1.1.0
 
 ### New Features
