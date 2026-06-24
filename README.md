@@ -181,6 +181,7 @@ The following hardening measures are built into the application:
 
 | Measure | Detail |
 |---|---|
+| **Content Security Policy** | Apache sets `script-src 'self' https://cdn.jsdelivr.net` — no `unsafe-inline`; server-side variables are passed to JS via `js/config.php` (an external PHP-served script) rather than an inline block |
 | **CSRF protection** | Every state-changing POST requires a per-session token validated server-side |
 | **Session cookies** | `HttpOnly`, `SameSite=Strict`, and `Secure` (auto-detected) set on every session |
 | **No password hashes in API** | `user_pass` and `admin_pass` are never included in JSON API responses |

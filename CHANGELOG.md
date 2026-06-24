@@ -1,5 +1,16 @@
 # OpenVPN-Admin Version History
 
+## 1.1.3
+
+### Fixes
+- **All admin buttons missing / Fail2Ban page stuck on spinner** — the `Content-Security-Policy` header (`script-src 'self'`) silently blocked the inline `<script>` block that set `window.ADMIN_ROLE`, `window.CURRENT_PAGE`, and `window.CSRF_TOKEN`. As a result `isSuperAdmin` was always `false` (hiding every edit/delete/reset button on the Users, Admins, and Certificates pages) and `currentPage` defaulted to `'dashboard'` (so `loadFail2Ban()` was never called, leaving the Fail2Ban page frozen on the loading spinner). Fixed by moving the three variables into `js/config.php`, a PHP-served external script that satisfies the `'self'` CSP directive.
+- **Sudoers file missing after `update.sh`** — when running an older copy of `update.sh` the script git-pulls itself mid-run, but the already-loaded (old) process does not re-read the new version; the sudoers block introduced in v1.1.0 was therefore never written. `update.sh` now always writes `/etc/sudoers.d/openvpn-admin`.
+
+### Improvements
+- **Asset cache busting** — `grids.js` and `index.css` are now loaded with a `?v=<filemtime>` query string so future updates take effect immediately without requiring a hard refresh.
+
+---
+
 ## 1.1.2
 
 - **Ban/unban notifications** — banning or unbanning an IP via the Fail2Ban page now creates an in-app notification for super-admins; the bell refreshes immediately after the action
