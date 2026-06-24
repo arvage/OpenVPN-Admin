@@ -72,11 +72,19 @@ fi
 
 chown -R "$user:$group" "$www"
 
-# --- Add sudoers entry for EasyRSA if missing (enables web UI cert mgmt) ------
-if [ ! -f /etc/sudoers.d/openvpn-admin ]; then
-  echo -e "${Green}Adding sudoers entry for EasyRSA...${NC}"
-  echo "$user ALL=(ALL) NOPASSWD: /etc/openvpn/easy-rsa/easyrsa" > /etc/sudoers.d/openvpn-admin
-  chmod 440 /etc/sudoers.d/openvpn-admin
+# --- sudoers: EasyRSA + fail2ban-client (required for web UI) ----------------
+echo -e "${Green}Updating sudoers for EasyRSA and fail2ban-client...${NC}"
+cat > /etc/sudoers.d/openvpn-admin <<-EOF
+$user ALL=(ALL) NOPASSWD: /etc/openvpn/easy-rsa/easyrsa
+$user ALL=(ALL) NOPASSWD: /usr/bin/fail2ban-client
+EOF
+chmod 440 /etc/sudoers.d/openvpn-admin
+
+# --- Install fail2ban if not already present ----------------------------------
+if ! command -v fail2ban-client &>/dev/null; then
+  echo -e "${Green}Installing fail2ban...${NC}"
+  apt-get install -y -q fail2ban 2>/dev/null || \
+    echo -e "${Yellow}Warning: could not install fail2ban. Install manually: sudo apt install fail2ban${NC}"
 fi
 
 # --- Create /var/log/openvpn/ if missing (needed for live dashboard) ----------
@@ -184,6 +192,53 @@ if [ "$SERVER_CONF_CHANGED" = true ]; then
   echo -e "${Green}Restarting OpenVPN (server.conf was patched)...${NC}"
   systemctl restart openvpn@server 2>/dev/null || \
     echo -e "${Yellow}Warning: could not restart openvpn@server. Restart it manually.${NC}"
+fi
+
+# --- Fail2Ban -----------------------------------------------------------------
+if command -v fail2ban-client &>/dev/null; then
+  echo -e "${Green}Configuring Fail2Ban...${NC}"
+
+  # Read port/protocol from existing server.conf so the jail matches the VPN setup
+  f2b_port=$(grep -oP '^port \K\d+' /etc/openvpn/server.conf 2>/dev/null || echo "1194")
+  f2b_proto=$(grep -oP '^proto \K\S+' /etc/openvpn/server.conf 2>/dev/null || echo "udp")
+
+  # OpenVPN filter: catches auth failures and TLS errors in the server log
+  cat > /etc/fail2ban/filter.d/openvpn.conf <<-'FILTER'
+[Definition]
+failregex = <HOST>:\d+ TLS Auth Error:
+            <HOST>:\d+ AUTH_FAILED
+            <HOST>:\d+ TLS Error: TLS key negotiation failed
+ignoreregex =
+FILTER
+
+  # Jail config: sshd + OpenVPN (idempotent — safe to overwrite on every update)
+  cat > /etc/fail2ban/jail.d/openvpn-admin.conf <<-JAILCONF
+[DEFAULT]
+bantime  = 3600
+findtime = 600
+maxretry = 5
+banaction = iptables-multiport
+
+[sshd]
+enabled  = true
+port     = ssh
+logpath  = %(sshd_log)s
+backend  = %(sshd_backend)s
+
+[openvpn]
+enabled  = true
+port     = $f2b_port
+protocol = $f2b_proto
+filter   = openvpn
+logpath  = /var/log/openvpn/openvpn.log
+maxretry = 5
+JAILCONF
+
+  systemctl enable fail2ban 2>/dev/null || true
+  systemctl restart fail2ban 2>/dev/null || \
+    echo -e "${Yellow}Warning: could not restart fail2ban. Restart it manually.${NC}"
+else
+  echo -e "${Yellow}fail2ban not found — skipping jail configuration.${NC}"
 fi
 
 # --- Summary ------------------------------------------------------------------
