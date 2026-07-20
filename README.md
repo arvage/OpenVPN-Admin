@@ -17,7 +17,7 @@ A web-based administration panel for OpenVPN servers — manage users, certifica
 | **Role-based Admin Access** | `super-admin` (full control) and `read-only` roles for web panel admins |
 | **Admin Profile** | Any admin can set their own email address via the Profile button in the topbar |
 | **Email Notifications** | SMTP configuration with optional alerts on user connect, disconnect, or account expiry |
-| **Client Configs** | Edit and version-history GNU/Linux, Windows, and macOS `.ovpn` templates in-browser |
+| **Client Configs** | Edit the shared `.ovpn` template in-browser, with version history |
 | **Modern UI** | Bootstrap 5 interface with dark sidebar, stats cards, and responsive layout |
 
 ---
@@ -117,7 +117,7 @@ Each row has three action buttons:
 Any logged-in admin can update their own email address using the **Profile** button in the topbar. Super-admins can also edit any other admin's email directly from the Admins grid.
 
 ### Configs
-Edit the raw OpenVPN client configuration templates for GNU/Linux, Windows, and macOS directly in the browser. Changes are saved with a version history so you can review or restore previous configs.
+Edit the raw OpenVPN client configuration template directly in the browser (Editor tab). Changes are saved with a version history so you can review or restore previous configs.
 
 ### Settings → SMTP
 Configure outgoing email:

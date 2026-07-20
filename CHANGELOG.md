@@ -1,5 +1,16 @@
 # OpenVPN-Admin Version History
 
+## 1.1.4
+
+### Fixes
+- **Public IP never applied to client `.ovpn` files** — `install.sh` patched the placeholder `remote xxx.xxx.xxx.xxx 1194/443`, but the shipped templates actually use `remote 10.10.100.27 1194`. The `sed` pattern never matched, so every fresh install (including the one-liner installer) shipped `.ovpn` files still pointing at the example IP instead of the detected/entered public IP. The installer now matches the real placeholder.
+- **Fail2Ban page always shows the "grant sudo access" warning, even after following it** — on Ubuntu 26.04+, `apache2.service` ships with `InaccessiblePaths=-/etc/sudoers` and `-/etc/sudoers.d`, which hides sudo's config from Apache and everything it spawns (PHP included) as a defense against a compromised web app escalating to root. This silently broke the web UI's `sudo fail2ban-client` / `sudo easyrsa` calls regardless of what was in `/etc/sudoers.d` — adding the suggested sudoers entry had no effect. `install.sh` now drops a systemd override (`apache2.service.d/openvpn-admin-sudo.conf`) that re-declares `InaccessiblePaths` without those two entries, when the packaged unit has them.
+
+### Changes
+- **Client Configuration Editor simplified** — the GNU/Linux and macOS/Viscosity tabs are removed from the admin Configs page; only the shared `.ovpn` template remains, under a single "Editor" tab.
+
+---
+
 ## 1.1.3
 
 ### Fixes
