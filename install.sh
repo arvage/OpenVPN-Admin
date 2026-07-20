@@ -362,8 +362,8 @@ sed -i "s/\$pass = '';/\$pass = '$mysql_pass';/" ./include/config.php
 
 # Patch client config files with server IP and protocol
 for file in $(find . -name "client.ovpn"); do
-  sed -i "s/remote xxx\.xxx\.xxx\.xxx 1194/remote $public_ip $server_port/" "$file"
-  sed -i "s/remote xxx\.xxx\.xxx\.xxx 443/remote $public_ip $server_port/"  "$file"
+  sed -i "s/remote 10\.10\.100\.27 1194/remote $public_ip $server_port/" "$file"
+  sed -i "s/remote 10\.10\.100\.27 443/remote $public_ip $server_port/"  "$file"
   [ "$openvpn_proto" = "udp" ] && sed -i "s/proto tcp-client/proto udp/" "$file"
   # Keep compression in sync with server (comp-lzo is deprecated in OpenVPN 2.5+)
   sed -i 's/^comp-lzo$/compress lz4-v2/' "$file"
@@ -432,6 +432,25 @@ a2enmod rewrite 2>/dev/null || true
 
 a2dissite 000-default
 a2ensite openvpn
+
+# Some distros (e.g. Ubuntu 26.04+) ship apache2.service with
+# InaccessiblePaths=-/etc/sudoers(.d), which hides sudo's config from Apache
+# and everything it spawns — silently breaking the web UI's sudo-based calls
+# to fail2ban-client/easyrsa regardless of what's in /etc/sudoers.d. Re-declare
+# InaccessiblePaths without those two entries, keeping every other restriction
+# from the packaged unit intact.
+if systemctl cat apache2.service 2>/dev/null | grep -qE '^InaccessiblePaths=-?/etc/sudoers(\.d)?$'; then
+  mkdir -p /etc/systemd/system/apache2.service.d
+  {
+    echo "[Service]"
+    echo "InaccessiblePaths="
+    systemctl cat apache2.service 2>/dev/null \
+      | grep -E '^InaccessiblePaths=' \
+      | grep -vE '^InaccessiblePaths=-?/etc/sudoers(\.d)?$'
+  } > /etc/systemd/system/apache2.service.d/openvpn-admin-sudo.conf
+  systemctl daemon-reload
+fi
+
 systemctl restart apache2
 
 # ─── Start OpenVPN ────────────────────────────────────────────────────────────

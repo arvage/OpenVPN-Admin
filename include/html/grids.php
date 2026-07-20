@@ -115,18 +115,8 @@ function getHistory($cfg_file, $accordion_id, $open_first = false) {
     <h6 class="mb-3 fw-semibold"><i class="bi bi-file-earmark-code me-2"></i>Client Configurations</h6>
     <ul class="nav nav-tabs mb-3" id="config-tabs">
       <li class="nav-item">
-        <a class="nav-link active" data-bs-toggle="tab" href="#cfg-linux">
-          <i class="bi bi-terminal me-1"></i>GNU/Linux
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#cfg-windows">
-          <i class="bi bi-windows me-1"></i>Windows
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#cfg-osx">
-          <i class="bi bi-apple me-1"></i>macOS / Viscosity
+        <a class="nav-link active" data-bs-toggle="tab" href="#cfg-windows">
+          <i class="bi bi-code-slash me-1"></i>Editor
         </a>
       </li>
       <?php if($adminRole === 'super-admin'): ?>
@@ -138,17 +128,9 @@ function getHistory($cfg_file, $accordion_id, $open_first = false) {
       <?php endif; ?>
     </ul>
     <div class="tab-content" id="config-tab-content">
-      <div class="tab-pane fade show active" id="cfg-linux">
-        <textarea class="form-control font-monospace cfg-textarea" data-config-file="<?= $cfg_file='client-conf/gnu-linux/client.conf' ?>" rows="18" <?= $adminRole!=='super-admin'?'readonly':'' ?>><?= htmlspecialchars(file_get_contents($cfg_file)) ?></textarea>
-        <?= getHistory($cfg_file, 1) ?>
-      </div>
-      <div class="tab-pane fade" id="cfg-windows">
+      <div class="tab-pane fade show active" id="cfg-windows">
         <textarea class="form-control font-monospace cfg-textarea" data-config-file="<?= $cfg_file='client-conf/windows/client.ovpn' ?>" rows="18" <?= $adminRole!=='super-admin'?'readonly':'' ?>><?= htmlspecialchars(file_get_contents($cfg_file)) ?></textarea>
         <?= getHistory($cfg_file, 2) ?>
-      </div>
-      <div class="tab-pane fade" id="cfg-osx">
-        <textarea class="form-control font-monospace cfg-textarea" data-config-file="<?= $cfg_file='client-conf/osx-viscosity/client.conf' ?>" rows="18" <?= $adminRole!=='super-admin'?'readonly':'' ?>><?= htmlspecialchars(file_get_contents($cfg_file)) ?></textarea>
-        <?= getHistory($cfg_file, 3) ?>
       </div>
     </div>
   </div>
